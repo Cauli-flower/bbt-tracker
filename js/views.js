@@ -258,11 +258,13 @@ window.Views = (function () {
           ], _cur.lh)}
         </div>
         <div class="field">
-          <label>宫颈黏液 <span class="sub">蛋清拉丝＝最易孕</span></label>
+          <label>宫颈黏液 <span class="sub">不会看分泌物？凭感觉选「湿润 / 滑溜」就行</span></label>
           ${seg('mucus', 'mucus', [
-            { v: 'none', label: '未观察' }, { v: 'dry', label: '干燥' },
+            { v: 'none', label: '未观察' }, { v: 'dry', label: '干' },
+            { v: 'wet', label: '湿润' }, { v: 'slippery', label: '滑溜' },
             { v: 'sticky', label: '黏稠' }, { v: 'creamy', label: '乳白' }, { v: 'eggwhite', label: '蛋清拉丝' },
           ], _cur.mucus)}
+          <div class="sub" style="margin-top:8px">「滑溜」＝走动时有润滑感，和「蛋清拉丝」一样接近排卵、最易孕；平时多是「干」。看不清就只凭感觉选，比纠结分泌物形态轻松。</div>
         </div>
         <div class="field">
           <label>同房 <span class="sub">记在实际发生那天</span></label>
@@ -374,12 +376,16 @@ window.Views = (function () {
 
     const analyses = {}; cycles.forEach((cy) => { analyses[cy.index] = Cycle.analyzeCycle(cy); });
 
-    // 模式切换：单周期 / 多周期对比
+    // 模式切换：单周期 / 周期概览 / 曲线对比
     const mode = state.chartMode || 'single';
-    const modeBar = `<div class="seg" style="margin-bottom:14px">
-      <button data-mode="single" class="${mode === 'single' ? 'on' : ''}" style="${mode === 'single' ? 'background:var(--pink);color:#fff;border-color:transparent' : ''}">单周期</button>
-      <button data-mode="compare" class="${mode === 'compare' ? 'on' : ''}" style="${mode === 'compare' ? 'background:var(--pink);color:#fff;border-color:transparent' : ''}">多周期对比</button>
-    </div>`;
+    const modeBtn = (m, label) => `<button data-mode="${m}" class="${mode === m ? 'on' : ''}" style="${mode === m ? 'background:var(--pink);color:#fff;border-color:transparent' : ''}">${label}</button>`;
+    const modeBar = `<div class="seg" style="margin-bottom:14px">${modeBtn('single', '单周期')}${modeBtn('overview', '周期概览')}${modeBtn('compare', '曲线对比')}</div>`;
+
+    if (mode === 'overview') {
+      renderOverview(c, modeBar, cycles, analyses);
+      bindMode(c);
+      return;
+    }
 
     if (mode === 'compare') {
       if (cycles.length < 2) {
@@ -454,6 +460,84 @@ window.Views = (function () {
     c.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
       state.chartMode = b.dataset.mode; chart();
     }));
+  }
+
+  /* 周期概览：把最近若干周期按时间从上到下排成横条，
+   * 一眼看「周期长度是否在收窄、排卵(绿色)是否变多」——比叠加乱曲线更适合多囊看趋势。 */
+  function renderOverview(c, modeBar, cycles, analyses) {
+    const today = D.todayStr();
+    const list = cycles.slice(-8); // 最近 8 个周期
+    const rows = list.map((cy) => {
+      const a = analyses[cy.index];
+      const length = cy.isOpen ? D.diffDays(cy.start, today) + 1 : D.diffDays(cy.start, cy.nextStart);
+      let status = 'pending';
+      if (a.ovulationConfirmed) status = 'ovulatory';
+      else if (a.classification === 'anovulatory') status = 'anovulatory';
+      return {
+        index: cy.index, start: cy.start, length: Math.max(1, length),
+        isOpen: cy.isOpen, status, ovuCD: a.ovuCD,
+      };
+    });
+
+    const maxLen = Math.max(35, ...rows.map((r) => r.length));
+    const pct = (n) => (n / maxLen * 100).toFixed(1);
+    const COLOR = {
+      ovulatory: { base: '#c2d0b0', dark: '#94a87f', txt: '#6f8159' },
+      anovulatory: { base: '#dcc18f', dark: '#dcc18f', txt: '#a9803f' },
+      pending: { base: '#d6d0d3', dark: '#d6d0d3', txt: '#999' },
+    };
+    const statLabel = (r) => {
+      if (r.status === 'ovulatory') return `排卵<br>第${r.ovuCD}天`;
+      if (r.status === 'anovulatory') return '未见<br>排卵';
+      return r.isOpen ? '进行中' : '数据<br>不足';
+    };
+
+    const rowsHTML = rows.map((r) => {
+      const col = COLOR[r.status];
+      const lutealW = r.ovuCD ? (pct(r.length) - pct(r.ovuCD)).toFixed(1) : 0;
+      return `<div style="display:flex;align-items:center;gap:9px;margin:10px 0">
+        <div style="width:60px;flex-shrink:0;line-height:1.3">
+          <div style="font-size:12px;font-weight:600;color:#555">周期${r.index}</div>
+          <div style="font-size:11px;color:#999">${r.start.slice(5)}·${r.length}天</div>
+        </div>
+        <div style="position:relative;flex:1;height:24px;background:#f3eef0;border-radius:6px;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:${pct(r.length)}%;background:${col.base}"></div>
+          ${r.status === 'ovulatory' && r.ovuCD ? `
+            <div style="position:absolute;left:${pct(r.ovuCD)}%;width:${lutealW}%;top:0;bottom:0;background:${col.dark}"></div>
+            <div style="position:absolute;left:calc(${pct(r.ovuCD)}% - 1px);top:0;bottom:0;width:2px;background:#566b6e"></div>` : ''}
+        </div>
+        <div style="width:46px;flex-shrink:0;text-align:right;font-size:11px;font-weight:600;line-height:1.2;color:${col.txt}">${statLabel(r)}</div>
+      </div>`;
+    }).join('');
+
+    // 趋势小结（借用既有统计：是否规律 / 长度范围）
+    const stats = Cycle.cycleStats(cycles, Store.getSettings());
+    const ovuN = rows.filter((r) => r.status === 'ovulatory').length;
+    let summary;
+    if (stats.recordedCycles < 2) {
+      summary = '继续每天记录，攒够 2–3 个完整周期后，这里就能看出你的周期是在变规律、还是仍在波动。';
+    } else if (stats.irregular) {
+      summary = `最近 ${stats.recordedCycles} 个完整周期长度在 ${stats.minCycle}–${stats.maxCycle} 天之间波动（相差 ${stats.maxCycle - stats.minCycle} 天），目前还不太规律——多囊常如此。重点看<b>随时间横条是否慢慢变得一样长、绿色（排卵）是否变多</b>。`;
+    } else {
+      summary = `最近 ${stats.recordedCycles} 个完整周期长度比较稳定（${stats.minCycle}–${stats.maxCycle} 天），相对规律。其中 ${ovuN} 个确认了排卵。`;
+    }
+
+    c.innerHTML = modeBar + `
+      <div class="verdict pending">
+        <div class="vtitle">周期概览 · 看是否在变规律</div>
+        <div>每行是一个周期（上＝早，下＝近）。<b>横条越长＝周期越长；绿＝已确认排卵，黄＝未见排卵，灰＝进行中/数据不足；竖线＝排卵日。</b></div>
+        <div style="margin-top:8px">${summary}</div>
+      </div>
+      <div class="card">
+        ${rows.length ? rowsHTML : '<div class="empty-tip">还没有周期数据。</div>'}
+        <div class="legend" style="margin-top:14px">
+          <span><i class="dot" style="background:#94a87f"></i>已确认排卵</span>
+          <span><i class="dot" style="background:#dcc18f"></i>未见排卵</span>
+          <span><i class="dot" style="background:#d6d0d3"></i>进行中/不足</span>
+          <span>｜ 竖线＝排卵日</span>
+        </div>
+        <div class="sub" style="margin-top:10px">提示：多囊的体温曲线常常很乱，别盯单个月份；<b>看几个月的趋势</b>更靠谱。要精确判断排卵，建议结合生殖科 B 超。</div>
+      </div>`;
   }
 
   /* ==================================================================

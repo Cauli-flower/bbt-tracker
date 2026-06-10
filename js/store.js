@@ -9,7 +9,7 @@
  *     tempTime:    "06:30" | "",          // 测量时间（可选）
  *     period:      "none|light|medium|heavy",  // 经量；none = 非经期
  *     lh:          "none|negative|weak|strong|fading", // 排卵试纸
- *     mucus:       "none|dry|sticky|creamy|eggwhite",  // 宫颈黏液
+ *     mucus:       "none|dry|wet|slippery|sticky|creamy|eggwhite",  // 宫颈黏液（wet/slippery=按感觉记，slippery≈最易孕）
  *     intercourse: true | false,          // 同房
  *     note:        ""                     // 备注/心情
  *   }

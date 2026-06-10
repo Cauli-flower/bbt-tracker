@@ -97,7 +97,7 @@ window.Chart = (function () {
       let dy = my;
       if (window.Cycle.isPeriod(d)) { svg += `<circle cx="${xx}" cy="${dy}" r="4" fill="#ad8a86"/>`; }
       if (d.lh === 'strong') { svg += `<polygon points="${xx},${dy - 5} ${xx + 5},${dy + 4} ${xx - 5},${dy + 4}" fill="#8ea1a6"/>`; }
-      if (d.mucus === 'eggwhite') { svg += `<polygon points="${xx},${dy - 5} ${xx + 5},${dy} ${xx},${dy + 5} ${xx - 5},${dy}" fill="#9aa890"/>`; }
+      if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${dy - 5} ${xx + 5},${dy} ${xx},${dy + 5} ${xx - 5},${dy}" fill="#9aa890"/>`; }
       if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${dy - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
     }
 
@@ -114,7 +114,7 @@ window.Chart = (function () {
       <span style="color:#ad8a86">— — 覆盖线</span>
       <span><i class="dot" style="background:#ad8a86"></i>经期</span>
       <span>${I.tri(11, '#8ea1a6')} 试纸强阳</span>
-      <span>${I.dia(11, '#9aa890')} 蛋清拉丝</span>
+      <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜（最易孕）</span>
       <span>${I.heart(12, '#ad8a86')} 同房</span>
     </div>`;
   }
