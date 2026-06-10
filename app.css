@@ -160,16 +160,62 @@ body {
 .field > label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
 .field .sub { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
 
-.temp-row { display: flex; align-items: center; gap: 12px; }
-.temp-row input[type="number"] {
-  flex: 1; font-size: 26px; font-weight: 600; text-align: center;
-  border: 2px solid var(--line); border-radius: 14px; padding: 10px;
-  color: var(--pink); background: #fff;
+/* 体温 / 时间 自定义触发按钮 */
+.val-row { display: flex; align-items: stretch; gap: 12px; }
+.val-field {
+  flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 4px;
+  border: 2px solid var(--line); border-radius: 14px; padding: 12px 10px;
+  background: #fff; cursor: pointer; font-family: inherit;
 }
-.temp-row input[type="time"] {
-  border: 2px solid var(--line); border-radius: 12px; padding: 10px; font-size: 16px;
-  color: var(--ink); background: #fff;
+.val-field .val-num { font-size: 26px; font-weight: 600; color: var(--pink); }
+.val-field .val-unit { font-size: 15px; color: var(--ink-soft); }
+.time-field {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 2px solid var(--line); border-radius: 12px; padding: 10px 14px;
+  background: #fff; cursor: pointer; font-family: inherit; font-size: 15px; color: var(--ink-soft);
 }
+.time-field svg { display: block; stroke: var(--ink-soft); }
+
+/* 保存状态小标签 */
+.save-pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #efe7e3; color: var(--ink-soft); }
+.save-pill.saved { background: var(--blue-soft); color: #5f7174; }
+.save-pill.unsaved { background: #f3e3cf; color: #9a7636; }
+.btn.is-dirty { box-shadow: 0 0 0 3px rgba(173, 138, 134, .25), var(--shadow); }
+
+/* ---------- 数字键盘弹窗 ---------- */
+.np-card { max-width: 300px; }
+.np-title, .tp-card .np-title { font-size: 14px; color: var(--ink-soft); text-align: center; margin-bottom: 8px; }
+.np-display {
+  display: flex; align-items: baseline; justify-content: center; gap: 5px;
+  background: var(--pink-bg); border-radius: 12px; padding: 14px; margin-bottom: 14px;
+}
+.np-display .np-val { font-size: 32px; font-weight: 700; color: var(--pink); }
+.np-display .np-unit { font-size: 16px; color: var(--ink-soft); }
+.np-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.np-key {
+  border: none; background: var(--pink-bg); border-radius: 12px; padding: 16px 0;
+  font-size: 22px; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.np-key:active { background: var(--pink-soft); }
+.np-back { color: var(--ink-soft); }
+.np-actions { display: flex; gap: 10px; margin-top: 14px; }
+.np-cancel, .np-ok { flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 16px; cursor: pointer; font-family: inherit; }
+.np-cancel { background: var(--pink-bg); color: var(--ink-soft); }
+.np-ok { background: var(--pink); color: #fff; font-weight: 600; }
+
+/* ---------- 时间选择弹窗 ---------- */
+.tp-card { max-width: 280px; }
+.tp-cols { display: flex; align-items: stretch; justify-content: center; gap: 6px; }
+.tp-col {
+  flex: 1; max-height: 200px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--pink-bg); border-radius: 12px; padding: 6px;
+}
+.tp-colon { display: flex; align-items: center; font-size: 22px; color: var(--ink-soft); }
+.tp-cell {
+  width: 100%; border: none; background: none; border-radius: 8px; padding: 11px 0;
+  font-size: 18px; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.tp-cell.sel { background: var(--pink); color: #fff; font-weight: 600; }
 
 .seg { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg button {

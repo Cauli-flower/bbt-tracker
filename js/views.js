@@ -97,6 +97,103 @@ window.Views = (function () {
     draw();
   }
 
+  /* 自定义体温数字键盘（替代系统键盘，风格统一） */
+  function openNumpad(initial, onConfirm) {
+    let buf = (initial != null && !isNaN(initial)) ? String(initial) : '';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    const keys = ['1','2','3','4','5','6','7','8','9','.','0','⌫'];
+
+    function draw() {
+      overlay.innerHTML = `
+        <div class="dp-card np-card">
+          <div class="np-title">基础体温</div>
+          <div class="np-display"><span class="np-val">${buf === '' ? '—' : buf}</span><span class="np-unit">℃</span></div>
+          <div class="np-grid">${keys.map((k) => `<button class="np-key${k === '⌫' ? ' np-back' : ''}" data-k="${k}">${k}</button>`).join('')}</div>
+          <div class="np-actions">
+            <button class="np-cancel">取消</button>
+            <button class="np-ok">确定</button>
+          </div>
+        </div>`;
+      overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+      overlay.querySelectorAll('.np-key').forEach((b) => b.addEventListener('click', () => {
+        const k = b.dataset.k;
+        if (k === '⌫') buf = buf.slice(0, -1);
+        else if (k === '.') { if (buf === '') buf = '0.'; else if (!buf.includes('.')) buf += '.'; }
+        else {
+          if (buf.includes('.') && buf.split('.')[1].length >= 2) return; // 最多 2 位小数
+          if (buf.replace('.', '').length >= 4) return;                    // 最多 4 位数字
+          buf += k;
+        }
+        overlay.querySelector('.np-val').textContent = buf === '' ? '—' : buf;
+      }));
+      overlay.querySelector('.np-cancel').addEventListener('click', close);
+      overlay.querySelector('.np-ok').addEventListener('click', () => {
+        const v = buf === '' ? null : parseFloat(buf);
+        if (v != null && (isNaN(v) || v < 34 || v > 43)) { toast('请输入 34–43 之间的体温'); return; }
+        close(); onConfirm(v);
+      });
+    }
+    overlay.addEventListener('click', close);
+    draw();
+  }
+
+  /* 自定义时间选择（时:分 两列滚动） */
+  function openTimePicker(initial, onConfirm) {
+    let h = 6, mm = 30;
+    if (initial && /^\d{1,2}:\d{2}$/.test(initial)) { const p = initial.split(':'); h = +p[0]; mm = +p[1]; }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const mins = Array.from({ length: 60 }, (_, i) => i);
+
+    overlay.innerHTML = `
+      <div class="dp-card tp-card">
+        <div class="np-title">测量时间</div>
+        <div class="tp-cols">
+          <div class="tp-col" id="tp-h">${hours.map((x) => `<button class="tp-cell${x === h ? ' sel' : ''}" data-h="${x}">${D.pad(x)}</button>`).join('')}</div>
+          <div class="tp-colon">:</div>
+          <div class="tp-col" id="tp-m">${mins.map((x) => `<button class="tp-cell${x === mm ? ' sel' : ''}" data-m="${x}">${D.pad(x)}</button>`).join('')}</div>
+        </div>
+        <div class="np-actions">
+          <button class="np-cancel" id="tp-clear">清空</button>
+          <button class="np-ok" id="tp-ok">确定</button>
+        </div>
+      </div>`;
+    overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+
+    function pick(col, sel) { col.querySelectorAll('.tp-cell').forEach((c) => c.classList.remove('sel')); sel.classList.add('sel'); }
+    const colH = overlay.querySelector('#tp-h'), colM = overlay.querySelector('#tp-m');
+    colH.querySelectorAll('[data-h]').forEach((b) => b.addEventListener('click', () => { h = +b.dataset.h; pick(colH, b); }));
+    colM.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => { mm = +b.dataset.m; pick(colM, b); }));
+    overlay.querySelector('#tp-ok').addEventListener('click', () => { close(); onConfirm(`${D.pad(h)}:${D.pad(mm)}`); });
+    overlay.querySelector('#tp-clear').addEventListener('click', () => { close(); onConfirm(''); });
+    overlay.addEventListener('click', close);
+    // 选中项滚动到中间
+    setTimeout(() => {
+      [colH, colM].forEach((col) => { const s = col.querySelector('.sel'); if (s) col.scrollTop = s.offsetTop - col.clientHeight / 2 + s.clientHeight / 2; });
+    }, 0);
+  }
+
+  /* 保存状态提示 */
+  let _dirty = false;
+  function markDirty() { _dirty = true; renderStatus(); }
+  function setSaved() { _dirty = false; renderStatus(); }
+  function renderStatus() {
+    const el = document.getElementById('save-status');
+    if (el) {
+      if (_dirty) { el.className = 'save-pill unsaved'; el.textContent = '● 未保存的修改'; }
+      else if (_cur && isEmpty(_cur)) { el.className = 'save-pill'; el.textContent = '尚未记录'; }
+      else { el.className = 'save-pill saved'; el.textContent = '✓ 已保存'; }
+    }
+    const sb = document.getElementById('btn-save');
+    if (sb) sb.classList.toggle('is-dirty', _dirty);
+  }
+
   /* ==================================================================
    *  记录页
    * ================================================================== */
@@ -124,13 +221,22 @@ window.Views = (function () {
         </div>
       </div>
 
+      <div style="display:flex;justify-content:flex-end;margin:-4px 2px 12px">
+        <span id="save-status" class="save-pill saved">✓ 已保存</span>
+      </div>
+
       <div class="card">
         <div class="field">
           <label>基础体温 <span class="sub">℃ · 建议每天晨起、同一时间测量</span></label>
-          <div class="temp-row">
-            <input type="number" id="f-temp" inputmode="decimal" step="0.01" min="35" max="42"
-                   placeholder="36.50" value="${_cur.temp != null ? _cur.temp : ''}" />
-            <input type="time" id="f-time" value="${_cur.tempTime || ''}" />
+          <div class="val-row">
+            <button type="button" class="val-field" id="temp-field">
+              <span class="val-num" id="temp-disp">${_cur.temp != null ? _cur.temp.toFixed(2) : '点此输入'}</span>
+              <span class="val-unit">℃</span>
+            </button>
+            <button type="button" class="time-field" id="time-field">
+              ${Icons.svg('clock', { size: 15 })}
+              <span id="time-disp">${_cur.tempTime || '测量时间'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -177,15 +283,31 @@ window.Views = (function () {
       ${saved ? '<button class="btn ghost" id="btn-del">清除本日记录</button>' : ''}
     `;
 
+    // 新载入的一天视为「已保存」状态
+    _dirty = false; renderStatus();
+
     // —— 绑定 ——
-    c.querySelector('#f-temp').addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value); _cur.temp = isNaN(v) ? null : v;
+    // 体温：自定义数字键盘
+    c.querySelector('#temp-field').addEventListener('click', () => {
+      openNumpad(_cur.temp, (v) => {
+        _cur.temp = v;
+        c.querySelector('#temp-disp').textContent = v != null ? v.toFixed(2) : '点此输入';
+        markDirty();
+      });
     });
-    c.querySelector('#f-time').addEventListener('input', (e) => { _cur.tempTime = e.target.value; });
-    c.querySelector('#f-note').addEventListener('input', (e) => { _cur.note = e.target.value; });
+    // 测量时间：自定义时间选择
+    c.querySelector('#time-field').addEventListener('click', () => {
+      openTimePicker(_cur.tempTime, (t) => {
+        _cur.tempTime = t;
+        c.querySelector('#time-disp').textContent = t || '测量时间';
+        markDirty();
+      });
+    });
+    c.querySelector('#f-note').addEventListener('input', (e) => { _cur.note = e.target.value; markDirty(); });
     bindSeg(c, (name, val) => {
       if (name === 'intercourse') _cur.intercourse = (val === 'yes');
       else _cur[name] = val;
+      markDirty();
     });
 
     c.querySelector('#date-pick-btn').addEventListener('click', () => {
@@ -207,7 +329,7 @@ window.Views = (function () {
       record();
     });
 
-    c.querySelector('#btn-save').addEventListener('click', async () => { await saveCur(); toast('已保存 ✓'); });
+    c.querySelector('#btn-save').addEventListener('click', async () => { await saveCur(); setSaved(); toast('已保存 ✓'); });
     const del = c.querySelector('#btn-del');
     if (del) del.addEventListener('click', async () => {
       if (confirm('确定清除这一天的记录吗？')) { await Store.deleteDay(state.date); toast('已清除'); record(); }
