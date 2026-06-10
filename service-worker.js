@@ -2,7 +2,7 @@
  * service-worker.js — 离线缓存（只缓存程序文件，不碰用户数据；数据在 IndexedDB）
  * 改动代码后，把 CACHE 版本号 +1，旧缓存会自动清理。
  */
-const CACHE = 'thermo-v4';
+const CACHE = 'thermo-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -30,14 +30,14 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// 缓存优先，回退网络（纯静态应用，离线也能用）
+// 网络优先：在线时总取最新，更新即时生效；离线时回退到缓存（仍可离线用）
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
+    fetch(e.request).then((res) => {
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => caches.match(e.request).then((hit) => hit || caches.match('./index.html')))
   );
 });
