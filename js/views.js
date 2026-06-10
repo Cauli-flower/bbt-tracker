@@ -732,6 +732,12 @@ window.Views = (function () {
       </div>
 
       <div class="card">
+        <h2>检查更新 <span class="hint">当前版本 ${window.APP_VERSION || ''}</span></h2>
+        <p class="muted" style="margin:0 0 12px">桌面图标版没有下拉刷新；如果功能没更新过来，点这里强制拿最新版（不会影响你的数据）。</p>
+        <button class="btn secondary" id="btn-refresh">刷新 / 检查更新</button>
+      </div>
+
+      <div class="card">
         <h2>关于</h2>
         <p class="muted" style="line-height:1.7;margin:0">
           这是一个本地、私密的身体记录工具。所有数据保存在你手机的浏览器里，不会上传到任何服务器。<br><br>
@@ -742,6 +748,16 @@ window.Views = (function () {
       <button class="btn ghost" id="btn-reset" style="color:#b07a6e">清空全部数据</button>
     `;
 
+    c.querySelector('#btn-refresh').addEventListener('click', async () => {
+      toast('正在检查更新…');
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg) await reg.update();
+        }
+      } catch (e) {}
+      setTimeout(() => window.location.reload(), 400);
+    });
     c.querySelector('#btn-export').addEventListener('click', exportData);
     c.querySelector('#btn-import').addEventListener('click', () => c.querySelector('#file-input').click());
     c.querySelector('#file-input').addEventListener('change', importData);
