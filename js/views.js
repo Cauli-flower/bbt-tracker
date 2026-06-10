@@ -24,6 +24,26 @@ window.Views = (function () {
       r.mucus === 'none' && !r.intercourse && !(r.note || '').trim() && !r.tempTime;
   }
 
+  // 已保存内容清单（基于真正存入的记录，便于确认存没存上、存了哪些项）
+  const PERIOD_L = { light: '少', medium: '中', heavy: '多' };
+  const LH_L = { negative: '阴性', weak: '弱阳', strong: '强阳', fading: '转弱' };
+  const MUCUS_L = { dry: '干', wet: '湿润', slippery: '滑溜', sticky: '黏稠', creamy: '乳白', eggwhite: '蛋清拉丝' };
+  function daySummaryHTML(rec) {
+    if (!rec || isEmpty(rec)) return '<div class="sum-empty">这一天还没有保存任何记录。填好后记得点下面「保存」。</div>';
+    const chips = [];
+    if (rec.temp != null) chips.push(`<span class="sum-chip">体温 <b>${rec.temp.toFixed(2)}℃</b>${rec.tempTime ? ' · ' + rec.tempTime : ''}</span>`);
+    if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b></span>`);
+    if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
+    if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
+    if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
+    if ((rec.note || '').trim()) chips.push('<span class="sum-chip">备注 <b>已填</b></span>');
+    return `<div class="sum-list">${chips.join('')}</div>`;
+  }
+  function refreshSummary() {
+    const ds = document.getElementById('day-summary');
+    if (ds) ds.innerHTML = daySummaryHTML(isEmpty(_cur) ? null : _cur);
+  }
+
   /* ---------------- 工具 ---------------- */
   function seg(group, name, options, current) {
     return `<div class="seg ${group}" data-seg="${name}">` +
@@ -225,6 +245,11 @@ window.Views = (function () {
         <span id="save-status" class="save-pill saved">✓ 已保存</span>
       </div>
 
+      <div class="card" style="padding:14px 16px">
+        <h2 style="margin-bottom:10px">本日已保存 <span class="hint">${isToday ? '今天' : D.human(date).replace(/ 周.$/, '')}</span></h2>
+        <div id="day-summary">${daySummaryHTML(saved)}</div>
+      </div>
+
       <div class="card">
         <div class="field">
           <label>基础体温 <span class="sub">℃ · 建议每天晨起、同一时间测量</span></label>
@@ -331,7 +356,7 @@ window.Views = (function () {
       record();
     });
 
-    c.querySelector('#btn-save').addEventListener('click', async () => { await saveCur(); setSaved(); toast('已保存 ✓'); });
+    c.querySelector('#btn-save').addEventListener('click', async () => { await saveCur(); setSaved(); refreshSummary(); toast('已保存 ✓'); });
     const del = c.querySelector('#btn-del');
     if (del) del.addEventListener('click', async () => {
       if (confirm('确定清除这一天的记录吗？')) { await Store.deleteDay(state.date); toast('已清除'); record(); }

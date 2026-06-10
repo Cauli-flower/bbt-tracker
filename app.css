@@ -172,6 +172,17 @@ body {
 }
 .time-field svg { display: block; stroke: var(--ink-soft); }
 
+/* 本日已保存清单 */
+.sum-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.sum-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--pink-bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 10px; font-size: 13px; color: var(--ink-soft);
+}
+.sum-chip b { color: var(--pink); font-weight: 600; }
+.sum-chip svg { display: block; }
+.sum-empty { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+
 /* 保存状态小标签 */
 .save-pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #efe7e3; color: var(--ink-soft); }
 .save-pill.saved { background: var(--blue-soft); color: #5f7174; }
