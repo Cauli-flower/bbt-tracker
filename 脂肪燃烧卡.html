@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#3f8aa0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="脂肪燃烧卡" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="manifest" href="脂肪燃烧卡.webmanifest" />
+<title>脂肪燃烧卡</title>
+<style>
+  :root{
+    --bg1:#eef5f6; --bg2:#f2f7f3; --bg3:#f7f3ec;
+    --card:#fff; --ink:#26333a; --soft:#65737a;
+    --c:#3f8aa0; --c-d:#2f6f82; --soft-c:#e4eef1; --line:#e7eef0;
+    --warn:#b07a4e; --good:#4f9e84; --line-dash:#eef2f3;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(160deg,var(--bg1) 0%,var(--bg2) 52%,var(--bg3) 100%);
+    color:var(--ink);line-height:1.6;padding:20px 14px 46px;max-width:560px;margin:0 auto;min-height:100vh}
+  header{text-align:center;margin:6px 0 16px}
+  header h1{font-size:21px;margin:0 0 4px;font-weight:700}
+  header p{margin:0;color:var(--soft);font-size:13px}
+
+  .card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 14px rgba(50,110,130,.07)}
+  .card>h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;font-weight:700}
+  .card>h2 .hint{margin-left:auto;font-weight:400;font-size:12px;color:var(--soft)}
+  .emoji{font-size:19px}
+
+  /* 坚持天数 */
+  .streak{background:linear-gradient(135deg,var(--c),#5fb0c2);color:#fff;border-radius:20px;
+    padding:18px 16px;text-align:center;box-shadow:0 4px 18px rgba(63,138,160,.28);margin-bottom:14px}
+  .streak .big{font-size:40px;font-weight:800;line-height:1.1;letter-spacing:1px}
+  .streak .big small{font-size:16px;font-weight:600;margin-left:3px}
+  .streak .sub{font-size:13px;opacity:.95;margin-top:4px}
+  .streak .fire{font-size:13.5px;font-weight:700;margin-top:9px;background:rgba(255,255,255,.18);
+    display:inline-block;padding:3px 13px;border-radius:20px}
+  .pbar{margin-top:12px;height:7px;border-radius:6px;background:rgba(255,255,255,.25);overflow:hidden}
+  .pbar>i{display:block;height:100%;background:#fff;border-radius:6px;transition:width .35s}
+  .pnote{font-size:11.5px;opacity:.9;margin-top:6px}
+
+  /* 打卡行 */
+  .chk{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);cursor:pointer;user-select:none}
+  .chk:first-of-type{border-top:none}
+  .box{flex-shrink:0;width:26px;height:26px;border-radius:9px;border:2px solid #cdd9dc;
+    display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;transition:.15s}
+  .chk.on .box{background:var(--c);border-color:var(--c)}
+  .chk .t{flex:1}
+  .chk .t b{font-weight:600;font-size:15px}
+  .chk.on .t b{color:var(--c-d)}
+  .chk .t .d{font-size:12px;color:var(--soft);margin-top:1px}
+  .chk .badge{flex-shrink:0;font-size:12px;font-weight:700;color:var(--c);background:var(--soft-c);
+    padding:3px 10px;border-radius:20px}
+  .chk-note{font-size:11.5px;color:var(--soft);margin-top:12px;line-height:1.6;
+    border-top:1px dashed var(--line);padding-top:10px}
+  .chk-note b{color:var(--c-d)}
+  .btn.saved-btn{background:#dde7e3;color:#3f7a63}
+
+  /* 本月日历 */
+  .mo-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .mo-nav button{border:none;background:var(--soft-c);color:var(--c-d);width:32px;height:32px;
+    border-radius:10px;font-size:17px;cursor:pointer}
+  .mo-nav button:disabled{opacity:.35}
+  .mo-nav .t{font-weight:700;font-size:14px}
+  .mo-stats{display:flex;gap:8px;margin-bottom:12px}
+  .mo-stat{flex:1;text-align:center;background:#f6f8f9;border-radius:12px;padding:9px 4px}
+  .mo-stat .n{font-size:21px;font-weight:800;line-height:1}
+  .mo-stat .l{font-size:11px;color:var(--soft);margin-top:3px}
+  .mo-stat.done .n{color:#3f7a63} .mo-stat.partial .n{color:#a9803f} .mo-stat.miss .n{color:#9aa6aa}
+  .mo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .mo-wd{text-align:center;font-size:11px;color:#9aa6aa;padding-bottom:2px}
+  .mo-cell{aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:12px;background:#eef1f2;color:#b9c2c5}
+  .mo-cell.empty{background:transparent}
+  .mo-cell.future{background:#f7f9fa;color:#cdd5d8}
+  .mo-cell.done{background:#cfe3d9;color:#3f7a63;font-weight:700}
+  .mo-cell.partial{background:#f0e0c2;color:#a9803f;font-weight:700}
+  .mo-cell.miss{background:#eef1f2;color:#b9c2c5}
+  .mo-cell.today{box-shadow:0 0 0 2px var(--c)}
+
+  /* 补剂展开 */
+  .supp-wrap{border-top:1px solid var(--line)}
+  .supp-head{display:flex;align-items:center;gap:12px;padding:12px 0;cursor:pointer;user-select:none}
+  .supp-head .box{flex-shrink:0;width:26px;height:26px;border-radius:9px;border:2px solid #cdd9dc;
+    display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
+  .supp-head.full .box{background:var(--c);border-color:var(--c)}
+  .supp-head.some .box{background:#9fc6d1;border-color:#9fc6d1}
+  .supp-head .t{flex:1}
+  .supp-head .t b{font-weight:600;font-size:15px}
+  .supp-head .caret{color:var(--soft);font-size:13px;transition:transform .2s}
+  .supp-wrap.open .caret{transform:rotate(180deg)}
+  .supp-list{display:none;padding:2px 0 8px 0}
+  .supp-wrap.open .supp-list{display:block}
+  .supp{display:flex;align-items:center;gap:11px;padding:9px 0 9px 6px;border-top:1px dashed var(--line-dash);cursor:pointer;user-select:none}
+  .supp .dot{flex-shrink:0;width:20px;height:20px;border-radius:7px;border:2px solid #d3dde0;
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:.15s}
+  .supp.on .dot{background:var(--c);border-color:var(--c)}
+  .supp .sn{flex:1;font-size:14px}
+  .supp.on .sn{color:var(--c-d);font-weight:600}
+  .supp .sd{font-size:11.5px;color:var(--soft);flex-shrink:0}
+
+  /* 每周记录 */
+  .wk-row{display:flex;gap:10px;margin-bottom:10px}
+  .wk-field{flex:1}
+  .wk-field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+  .wk-field label span{font-weight:400;color:var(--soft);font-size:11.5px}
+  .wk-field .inp{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:0 10px;background:#fff}
+  .wk-field input{flex:1;border:none;outline:none;font-size:18px;padding:10px 0;width:100%;background:transparent;color:var(--ink)}
+  .wk-field .u{font-size:13px;color:var(--soft)}
+  .btn{display:block;width:100%;border:none;border-radius:13px;padding:13px;font-size:15px;font-weight:700;
+    background:var(--c);color:#fff;cursor:pointer}
+  .btn:active{transform:scale(.99)}
+  .wk-latest{font-size:13px;color:var(--soft);margin-top:12px;line-height:1.8}
+  .wk-latest b{color:var(--ink)}
+  .trend{font-weight:700;margin-left:4px}
+  .trend.down{color:var(--good)} .trend.up{color:var(--warn)}
+  .wk-hist{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+  .wk-hist .h{display:flex;justify-content:space-between;font-size:12.5px;color:var(--soft);padding:4px 0}
+
+  /* 趋势图 */
+  .tr-block{margin-bottom:6px}
+  .tr-block:last-child{margin-bottom:0}
+  .tr-head{display:flex;align-items:baseline;gap:8px;margin:4px 0 2px}
+  .tr-head .nm{font-size:13px;font-weight:700}
+  .tr-head .cur{font-size:13px;font-weight:700}
+  .tr-head .cur small{font-size:11px;font-weight:400;color:var(--soft)}
+  .tr-head .dt{margin-left:auto;font-size:11.5px}
+  .tr-head .dt.down{color:var(--good)} .tr-head .dt.up{color:var(--warn)}
+  .tr-svg{width:100%;height:auto;display:block}
+  .tr-x{display:flex;justify-content:space-between;font-size:11px;color:#9aa6aa;margin-top:1px}
+  .tr-tip{font-size:11.5px;color:var(--soft);margin-top:8px;line-height:1.6}
+  .tr-empty{font-size:13px;color:var(--soft);line-height:1.7}
+
+  .why li{margin:6px 0;font-size:13px}
+  .why b{color:var(--c-d)}
+  ul.why{margin:2px 0;padding-left:18px}
+
+  .foot{text-align:center;color:var(--soft);font-size:11.5px;margin-top:18px;line-height:1.7}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+    background:rgba(38,51,58,.94);color:#fff;padding:10px 20px;border-radius:22px;font-size:14px;
+    opacity:0;pointer-events:none;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 脂肪燃烧卡</h1>
+  <p>每天点几个勾 · 重在坚持 · 数据只存这台手机</p>
+</header>
+
+<!-- 坚持天数 -->
+<div class="streak" id="streak"></div>
+
+<!-- 今日打卡 -->
+<div class="card">
+  <h2><span class="emoji">✅</span>今日打卡 <span class="hint" id="today-label"></span></h2>
+  <div id="checklist"></div>
+  <div class="chk-note">默认当天都做到 ✓，<b>没做到的点掉即可</b>。补剂会自动沿用你上次的勾选。<br>调整好后点下面保存，<b>这天才算数</b>——没保存的天记为「未记录」。</div>
+  <button class="btn" id="day-save" style="margin-top:12px">保存今日打卡</button>
+</div>
+
+<!-- 本月完成情况 -->
+<div class="card">
+  <h2><span class="emoji">📅</span>本月完成 <span class="hint">绿=完成 · 黄=差一点 · 灰=未记录</span></h2>
+  <div id="month-body"></div>
+</div>
+
+<!-- 每周记录 -->
+<div class="card">
+  <h2><span class="emoji">📏</span>每周记一次 <span class="hint">看趋势就好</span></h2>
+  <div class="wk-field" style="margin-bottom:10px">
+    <label>记录日期 <span>可补记往日（漏记某周时）</span></label>
+    <div class="inp"><input type="date" id="wk-date" /></div>
+  </div>
+  <div class="wk-row">
+    <div class="wk-field">
+      <label>腰围 <span>目标 &lt;85</span></label>
+      <div class="inp"><input type="number" id="wk-waist" inputmode="decimal" placeholder="—" /><span class="u">cm</span></div>
+    </div>
+    <div class="wk-field">
+      <label>体重 <span>可选 · 63–65</span></label>
+      <div class="inp"><input type="number" id="wk-weight" inputmode="decimal" placeholder="—" /><span class="u">kg</span></div>
+    </div>
+  </div>
+  <button class="btn" id="wk-save">记录这次</button>
+  <div class="wk-latest" id="wk-latest"></div>
+  <div class="wk-hist" id="wk-hist"></div>
+</div>
+
+<!-- 趋势曲线 -->
+<div class="card" id="trend-card">
+  <h2><span class="emoji">📈</span>趋势 <span class="hint">看是在往下走，还是停了</span></h2>
+  <div id="trend-body"></div>
+</div>
+
+<!-- 为什么这几项 -->
+<div class="card">
+  <h2><span class="emoji">💡</span>为什么盯这几项</h2>
+  <ul class="why">
+    <li><b>少久坐、常起身</b>：久坐会拉低日常代谢；每小时起来走动（NEAT）一天能多消耗不少，也别长时间局部受热焐着。</li>
+    <li><b>适度运动 + 少糖少精制碳水</b>：减脂主要靠吃 + 有氧；快走 / 遛狗 / 游泳就够，不用练很猛。</li>
+    <li><b>睡够</b>：缺觉皮质醇升高，专门往肚子上囤脂肪。</li>
+    <li><b>盯腰围</b>：男性腰围比体重更能反映该减的内脏脂肪——目标 &lt;85，争取 &lt;80，红线 90。</li>
+    <li>内脏脂肪“先胖也先掉”，对中等强度运动 + 管嘴反应快；坚持约三个月就能看出变化。</li>
+  </ul>
+</div>
+
+<div class="foot">
+  以上为一般健康与减脂参考，非个体化医疗方案。<br>
+  补剂种类、是否需进一步检查，请以医生为准。
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var KEY = 'fatburn_v1';
+  var GOAL = 90; // 坚持目标天数（养成习惯 / 看出变化）
+
+  var DAILY = [
+    { k: 'move',     n: '少久坐 · 常起身',   d: '每小时起来走动；别长时间局部受热焐着' },
+    { k: 'exercise', n: '适度运动',         d: '快走 / 遛狗 / 游泳 30 分钟' },
+    { k: 'sleep',    n: '睡够 7 小时',       d: '规律作息，别熬夜' },
+    { k: 'diet',     n: '少糖少精制碳水',     d: '管住嘴，帮着减肚子' },
+  ];
+  var SUPPS = [
+    { k: 'coq10',     n: '辅酶 Q10',      d: '代谢' },
+    { k: 'carnitine', n: '左旋肉碱',       d: '燃脂' },
+    { k: 'zinc',      n: '锌',            d: '免疫' },
+    { k: 'selenium',  n: '硒',            d: '抗氧化' },
+    { k: 'vc',        n: '维生素 C',       d: '抗氧化' },
+    { k: 've',        n: '维生素 E',       d: '抗氧化' },
+    { k: 'omega3',    n: 'Omega-3 鱼油',  d: '心血管' },
+    { k: 'folate',    n: '叶酸',          d: '综合' },
+    { k: 'vd',        n: '维生素 D',       d: '综合' },
+  ];
+
+  /* ---------- 数据 ---------- */
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+  }
+  function save(s) { localStorage.setItem(KEY, JSON.stringify(s)); }
+  var state = load();
+  if (!state.days) state.days = {};
+  if (!state.weekly) state.weekly = [];
+  sortWeekly();
+  var suppOpen = false;
+  var viewMonth = null; // 本月日历当前查看的 YYYY-MM
+
+  function sortWeekly() {
+    state.weekly.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  }
+  // 同一天去重覆盖，并按日期排序（支持补记往日）
+  function putWeekly(entry) {
+    var i = -1;
+    for (var j = 0; j < state.weekly.length; j++) if (state.weekly[j].date === entry.date) { i = j; break; }
+    if (i >= 0) state.weekly[i] = entry; else state.weekly.push(entry);
+    sortWeekly();
+  }
+
+  /* ---------- 日期工具 ---------- */
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function todayStr() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function prevStr(s) { var p = s.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2] - 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function humanDay(s) { var p = s.split('-'); return (+p[1]) + ' 月 ' + (+p[2]) + ' 日'; }
+  var TODAY = todayStr();
+
+  function day(ds) {
+    if (!state.days[ds]) state.days[ds] = { move: false, exercise: false, sleep: false, diet: false, supps: {} };
+    if (!state.days[ds].supps) state.days[ds].supps = {};
+    return state.days[ds];
+  }
+  // 最近一条「之前」的记录（用于补剂承接上一天的选择）
+  function lastRecordedBefore(ds) {
+    var keys = Object.keys(state.days).filter(function (d) { return d < ds; }).sort();
+    return keys.length ? state.days[keys[keys.length - 1]] : null;
+  }
+  // 新的一天：每日项默认「已做到」（取消未做的即可）；补剂承接上一天勾选；confirmed=未保存
+  function makeNewDay() {
+    var prev = lastRecordedBefore(TODAY);
+    var supps = (prev && prev.supps) ? Object.assign({}, prev.supps) : {};
+    return { move: true, exercise: true, sleep: true, diet: true, supps: supps, confirmed: false };
+  }
+  function coreDone(rec) { return rec && rec.move && rec.exercise && rec.sleep && rec.diet; }
+  // 这天「真正完成」：已保存确认 且 每日项都做到
+  function isComplete(rec) { return rec && rec.confirmed && coreDone(rec); }
+  // 这天的状态：done=完成 / partial=已保存但差几项 / miss=未记录
+  function dayStatus(ds) {
+    var r = state.days[ds];
+    if (isComplete(r)) return 'done';
+    if (r && r.confirmed) return 'partial';
+    return 'miss';
+  }
+
+  /* ---------- 统计 ---------- */
+  function stats() {
+    var persistDays = 0;
+    for (var ds in state.days) if (state.days[ds] && state.days[ds].confirmed) persistDays++;
+    // 连续完成（从今天往回数，须已保存且全做到）
+    var streak = 0, cur = TODAY;
+    while (isComplete(state.days[cur])) { streak++; cur = prevStr(cur); }
+    return { persistDays: persistDays, streak: streak };
+  }
+
+  /* ---------- 渲染 ---------- */
+  function renderStreak() {
+    var s = stats();
+    var pct = Math.min(100, Math.round(s.persistDays / GOAL * 100));
+    var todayConfirmed = state.days[TODAY] && state.days[TODAY].confirmed;
+    var fire;
+    if (s.streak > 0) fire = '🔥 连续全做到 ' + s.streak + ' 天';
+    else if (todayConfirmed) fire = '今天已打卡 ✓（有几项没做到）';
+    else fire = '记得点下方「保存今日打卡」';
+    document.getElementById('streak').innerHTML =
+      '<div class="big">' + s.persistDays + '<small>天</small></div>' +
+      '<div class="sub">已坚持打卡</div>' +
+      '<div class="fire">' + fire + '</div>' +
+      '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="pnote">向 ' + GOAL + ' 天前进 · ' + pct + '%</div>';
+  }
+
+  function renderChecklist() {
+    var rec = day(TODAY);
+    var html = '';
+    DAILY.forEach(function (it) {
+      var on = rec[it.k];
+      html += '<div class="chk' + (on ? ' on' : '') + '" data-k="' + it.k + '">' +
+        '<div class="box">' + (on ? '✓' : '') + '</div>' +
+        '<div class="t"><b>' + it.n + '</b><div class="d">' + it.d + '</div></div>' +
+        '</div>';
+    });
+
+    // 补剂
+    var took = 0; SUPPS.forEach(function (sp) { if (rec.supps[sp.k]) took++; });
+    var cls = took === SUPPS.length ? ' full' : (took > 0 ? ' some' : '');
+    var mark = took === SUPPS.length ? '✓' : (took > 0 ? '–' : '');
+    html += '<div class="supp-wrap' + (suppOpen ? ' open' : '') + '">' +
+      '<div class="supp-head' + cls + '" id="supp-head">' +
+        '<div class="box">' + mark + '</div>' +
+        '<div class="t"><b>补剂</b></div>' +
+        '<span class="badge">今天 ' + took + '/' + SUPPS.length + '</span>' +
+        '<span class="caret">▾</span>' +
+      '</div>' +
+      '<div class="supp-list">';
+    SUPPS.forEach(function (sp) {
+      var on = !!rec.supps[sp.k];
+      html += '<div class="supp' + (on ? ' on' : '') + '" data-s="' + sp.k + '">' +
+        '<div class="dot">' + (on ? '✓' : '') + '</div>' +
+        '<div class="sn">' + sp.n + '</div>' +
+        '<div class="sd">' + sp.d + '</div>' +
+        '</div>';
+    });
+    html += '</div></div>';
+
+    var cl = document.getElementById('checklist');
+    cl.innerHTML = html;
+
+    // 绑定每日项
+    cl.querySelectorAll('.chk[data-k]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var k = el.dataset.k; rec[k] = !rec[k];
+        commit(); renderChecklist(); renderStreak(); renderMonth();
+      });
+    });
+    // 补剂展开/收起
+    var sh = document.getElementById('supp-head');
+    if (sh) sh.addEventListener('click', function () { suppOpen = !suppOpen; renderChecklist(); });
+    // 补剂副项
+    cl.querySelectorAll('.supp[data-s]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var k = el.dataset.s; rec.supps[k] = !rec.supps[k];
+        commit(); renderChecklist();
+      });
+    });
+  }
+
+  function renderWeekly() {
+    var w = state.weekly;
+    var latest = w.length ? w[w.length - 1] : null;
+    var prev = w.length > 1 ? w[w.length - 2] : null;
+    var el = document.getElementById('wk-latest');
+    if (!latest) {
+      el.innerHTML = '还没有记录。量一次腰围做个起点吧（早上空腹、过肚脐一圈、别收腹）。';
+    } else {
+      var parts = [];
+      if (latest.waist != null) {
+        var t = '';
+        if (prev && prev.waist != null) {
+          var dw = +(latest.waist - prev.waist).toFixed(1);
+          if (dw !== 0) t = '<span class="trend ' + (dw < 0 ? 'down' : 'up') + '">' + (dw < 0 ? '▼' : '▲') + Math.abs(dw) + '</span>';
+        }
+        var tip = latest.waist >= 90 ? '（先冲到 90 以下）' : (latest.waist >= 85 ? '（再争取 &lt;80）' : '（很好，保持）');
+        parts.push('最新腰围 <b>' + latest.waist + ' cm</b>' + t + ' ' + tip);
+      }
+      if (latest.weight != null) parts.push('体重 <b>' + latest.weight + ' kg</b>');
+      parts.push('<span style="color:#9aa6aa">记于 ' + humanDay(latest.date) + '</span>');
+      el.innerHTML = parts.join('<br>');
+    }
+    // 历史（最近 6 次）
+    var hist = document.getElementById('wk-hist');
+    var recent = w.slice(-6).reverse();
+    if (recent.length <= 1) { hist.innerHTML = ''; return; }
+    hist.innerHTML = recent.map(function (r) {
+      var bits = [];
+      if (r.waist != null) bits.push(r.waist + ' cm');
+      if (r.weight != null) bits.push(r.weight + ' kg');
+      return '<div class="h"><span>' + humanDay(r.date) + '</span><span>' + bits.join(' · ') + '</span></div>';
+    }).join('');
+  }
+
+  /* ---------- 趋势曲线 ---------- */
+  // pts: [{v, date}]；targets: [{v,label}]（虚线参考）
+  function spark(pts, color, targets) {
+    var W = 320, H = 132, pl = 8, pr = 12, pt = 14, pb = 6;
+    var vals = pts.map(function (p) { return p.v; });
+    var all = vals.concat(targets.map(function (t) { return t.v; }));
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    if (lo === hi) { lo -= 1; hi += 1; }
+    var pad = (hi - lo) * 0.18 || 1; lo -= pad; hi += pad;
+    var X = function (i) { return pts.length > 1 ? pl + i * (W - pl - pr) / (pts.length - 1) : pl + (W - pl - pr) / 2; };
+    var Y = function (v) { return pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb); };
+
+    var svg = '<svg class="tr-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
+    // 目标虚线
+    targets.forEach(function (t) {
+      var y = Y(t.v).toFixed(1);
+      svg += '<line x1="' + pl + '" y1="' + y + '" x2="' + (W - pr) + '" y2="' + y + '" stroke="#cdd9dc" stroke-width="1" stroke-dasharray="4 4"/>';
+      svg += '<text x="' + (W - pr) + '" y="' + (y - 3) + '" font-size="9" fill="#9aa6aa" text-anchor="end">' + t.label + '</text>';
+    });
+    // 折线
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1); }).join(' ');
+    svg += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
+    // 点（最后一个加大）
+    pts.forEach(function (p, i) {
+      var last = i === pts.length - 1;
+      svg += '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="' + (last ? 4 : 2.6) + '" fill="' + (last ? color : '#fff') + '" stroke="' + color + '" stroke-width="1.6"/>';
+    });
+    svg += '</svg>';
+    return svg;
+  }
+
+  function trendBlock(name, field, unit, color, targets) {
+    var pts = state.weekly
+      .filter(function (e) { return e[field] != null; })
+      .map(function (e) { return { v: e[field], date: e.date }; });
+    if (pts.length < 2) return null;
+    var last = pts[pts.length - 1], prev = pts[pts.length - 2];
+    var dv = +(last.v - prev.v).toFixed(1);
+    var dtHtml = dv === 0 ? '<span class="dt">持平</span>'
+      : '<span class="dt ' + (dv < 0 ? 'down' : 'up') + '">较上次 ' + (dv < 0 ? '▼' : '▲') + Math.abs(dv) + '</span>';
+    return '<div class="tr-block">' +
+      '<div class="tr-head"><span class="nm" style="color:' + color + '">' + name + '</span>' +
+        '<span class="cur">' + last.v + '<small> ' + unit + '</small></span>' + dtHtml + '</div>' +
+      spark(pts, color, targets) +
+      '<div class="tr-x"><span>' + humanDay(pts[0].date) + '</span><span>' + humanDay(last.date) + '</span></div>' +
+      '</div>';
+  }
+
+  function renderTrend() {
+    var waist = trendBlock('腰围', 'waist', 'cm', '#3f8aa0', [{ v: 85, label: '85' }, { v: 80, label: '80' }]);
+    var weight = trendBlock('体重', 'weight', 'kg', '#c79a5a', [{ v: 65, label: '65' }]);
+    var body = document.getElementById('trend-body');
+    if (!waist && !weight) {
+      var n = state.weekly.length;
+      body.innerHTML = '<div class="tr-empty">' +
+        (n === 0 ? '还没有记录。' : '已记 ' + n + ' 次，') +
+        '再记 ' + Math.max(1, 2 - state.weekly.filter(function (e) { return e.waist != null; }).length) +
+        ' 次腰围就会出现曲线，能一眼看出趋势。</div>';
+      return;
+    }
+    body.innerHTML = (waist || '') + (weight || '') +
+      '<div class="tr-tip">两条线各按自己的范围缩放，<b>看的是走势方向</b>（往下＝在掉），不是两条线的高低对比。虚线为目标参考。</div>';
+  }
+
+  /* ---------- 本月完成情况 ---------- */
+  function shiftMonth(ym, delta) {
+    var p = ym.split('-'); var dt = new Date(+p[0], +p[1] - 1 + delta, 1);
+    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1);
+  }
+  function renderMonth() {
+    var ym = viewMonth || TODAY.slice(0, 7);
+    var p = ym.split('-'); var y = +p[0], m = +p[1];
+    var lead = new Date(y, m - 1, 1).getDay();
+    var dim = new Date(y, m, 0).getDate();
+    var atMax = ym >= TODAY.slice(0, 7);
+    var done = 0, partial = 0, miss = 0, cells = '';
+    for (var i = 0; i < lead; i++) cells += '<div class="mo-cell empty"></div>';
+    for (var d = 1; d <= dim; d++) {
+      var ds = y + '-' + pad(m) + '-' + pad(d);
+      var cls = 'mo-cell';
+      if (ds > TODAY) { cls += ' future'; }
+      else {
+        var st = dayStatus(ds); cls += ' ' + st;
+        if (st === 'done') done++; else if (st === 'partial') partial++; else miss++;
+      }
+      if (ds === TODAY) cls += ' today';
+      cells += '<div class="' + cls + '">' + d + '</div>';
+    }
+    var wd = ['日', '一', '二', '三', '四', '五', '六'].map(function (w) { return '<div class="mo-wd">' + w + '</div>'; }).join('');
+    document.getElementById('month-body').innerHTML =
+      '<div class="mo-nav"><button id="mo-prev">‹</button>' +
+        '<span class="t">' + y + ' 年 ' + m + ' 月</span>' +
+        '<button id="mo-next"' + (atMax ? ' disabled' : '') + '>›</button></div>' +
+      '<div class="mo-stats">' +
+        '<div class="mo-stat done"><div class="n">' + done + '</div><div class="l">完成</div></div>' +
+        '<div class="mo-stat partial"><div class="n">' + partial + '</div><div class="l">差一点</div></div>' +
+        '<div class="mo-stat miss"><div class="n">' + miss + '</div><div class="l">未记录</div></div>' +
+      '</div>' +
+      '<div class="mo-grid">' + wd + cells + '</div>';
+    document.getElementById('mo-prev').addEventListener('click', function () { viewMonth = shiftMonth(ym, -1); renderMonth(); });
+    if (!atMax) document.getElementById('mo-next').addEventListener('click', function () { viewMonth = shiftMonth(ym, 1); renderMonth(); });
+  }
+
+  function renderDaySaveBtn() {
+    var b = document.getElementById('day-save');
+    var r = state.days[TODAY];
+    if (r && r.confirmed) { b.textContent = '✓ 今日已打卡（点可更新）'; b.classList.add('saved-btn'); }
+    else { b.textContent = '保存今日打卡'; b.classList.remove('saved-btn'); }
+  }
+
+  function commit() { save(state); }
+
+  /* ---------- 今日打卡保存 ---------- */
+  document.getElementById('day-save').addEventListener('click', function () {
+    var r = day(TODAY); r.confirmed = true; commit();
+    renderDaySaveBtn(); renderStreak(); renderMonth();
+    toast('今日已打卡 ✓');
+  });
+
+  /* ---------- 每周保存 ---------- */
+  document.getElementById('wk-save').addEventListener('click', function () {
+    var wi = document.getElementById('wk-waist').value.trim();
+    var we = document.getElementById('wk-weight').value.trim();
+    var dateEl = document.getElementById('wk-date');
+    var ds = dateEl.value || TODAY;
+    if (ds > TODAY) { toast('不能记未来的日期'); return; }
+    if (wi === '' && we === '') { toast('先填腰围或体重'); return; }
+    var entry = { date: ds };
+    if (wi !== '') entry.waist = parseFloat(wi);
+    if (we !== '') entry.weight = parseFloat(we);
+    putWeekly(entry);
+    commit();
+    document.getElementById('wk-waist').value = '';
+    document.getElementById('wk-weight').value = '';
+    dateEl.value = TODAY;
+    renderWeekly();
+    renderTrend();
+    toast('已记录 ✓');
+  });
+
+  /* ---------- toast ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1600);
+  }
+
+  /* ---------- 初始 ---------- */
+  // 今天若还没记录：在内存里铺好默认（每日项已做到 + 承接补剂），但不落盘；
+  // 只有点「保存今日打卡」才确认计数，避免忘了就被当成全做到。
+  if (!state.days[TODAY]) state.days[TODAY] = makeNewDay();
+  viewMonth = TODAY.slice(0, 7);
+
+  document.getElementById('today-label').textContent = humanDay(TODAY);
+  var wkDate = document.getElementById('wk-date');
+  wkDate.max = TODAY; wkDate.value = TODAY;
+  renderStreak();
+  renderChecklist();
+  renderDaySaveBtn();
+  renderMonth();
+  renderWeekly();
+  renderTrend();
+
+  /* ---------- 注册 Service Worker（让他能“安装应用”+离线） ---------- */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch(function () {});
+  }
+})();
+</script>
+
+</body>
+</html>
