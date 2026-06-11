@@ -709,6 +709,12 @@ window.Views = (function () {
     const c = $app();
     c.innerHTML = `
       <div class="card">
+        <h2>健康卡片 <span class="hint">放松 · 健身 · 饮食</span></h2>
+        <p class="muted" style="margin-top:0">日常养生小卡片：放松安心、一周锻炼跟练、稳血糖饮食搭配。</p>
+        <a class="btn secondary" href="调理主页.html" style="display:block;text-align:center;text-decoration:none">🌿 打开健康卡片</a>
+      </div>
+
+      <div class="card">
         <h2>数据备份</h2>
         <p class="muted" style="margin-top:0">共 ${days.length} 天记录。数据只存在本机，换手机时请先导出备份。</p>
         <button class="btn secondary" id="btn-export">导出备份文件</button>

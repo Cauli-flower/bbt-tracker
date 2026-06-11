@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#7c6fd6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="调理主页">
+<title>我的调理主页</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(160deg,#f1f0fb 0%,#f3f7f4 50%,#faf3ec 100%);
+    color:#2c2840;line-height:1.6;padding:28px 16px 48px;max-width:560px;margin:0 auto;min-height:100vh}
+  header{text-align:center;margin:10px 0 24px}
+  header h1{font-size:23px;margin:0 0 6px;font-weight:700}
+  header p{margin:0;color:#6b6580;font-size:13.5px}
+  .tile{display:flex;align-items:center;gap:15px;text-decoration:none;color:inherit;
+    background:#fff;border-radius:20px;padding:18px;margin-bottom:15px;
+    box-shadow:0 3px 16px rgba(90,70,160,.07);border-left:6px solid var(--c);transition:transform .1s}
+  .tile:active{transform:scale(.98)}
+  .tile .ico{width:50px;height:50px;border-radius:14px;background:var(--soft);
+    display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .tile .txt{flex:1}
+  .tile .t{font-size:17px;font-weight:700}
+  .tile .s{font-size:12.5px;color:#7a7488;margin-top:2px}
+  .tile .arrow{color:var(--c);font-size:20px;font-weight:700}
+  .relax{--c:#7c6fd6;--soft:#efeafc}
+  .fit{--c:#4f9e84;--soft:#e4f1ec}
+  .diet{--c:#cf8347;--soft:#f6e9dc}
+  .app{--c:#e7889b;--soft:#fae6ea}
+  .divider{text-align:center;color:#a8a2b5;font-size:12px;margin:22px 0 14px;position:relative}
+  .divider::before,.divider::after{content:"";position:absolute;top:50%;width:32%;height:1px;background:#ddd9e6}
+  .divider::before{left:0} .divider::after{right:0}
+  .foot{text-align:center;color:#9a94a8;font-size:11.5px;margin-top:22px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 我的调理主页</h1>
+  <p>日常养生 · 放松 · 运动 · 饮食，一个入口</p>
+</header>
+
+<a class="tile relax" href="放松卡片.html">
+  <div class="ico">🌿</div>
+  <div class="txt"><div class="t">放松 &amp; 安心卡片</div>
+    <div class="s">紧张、睡不着、心里乱时 → 呼吸·CBT·正念</div></div>
+  <div class="arrow">›</div>
+</a>
+
+<a class="tile fit" href="健身计划.html">
+  <div class="ico">🏋️‍♀️</div>
+  <div class="txt"><div class="t">一周锻炼计划</div>
+    <div class="s">增肌·塑形 · 每天点开就有跟练视频</div></div>
+  <div class="arrow">›</div>
+</a>
+
+<a class="tile diet" href="饮食卡.html">
+  <div class="ico">🍽️</div>
+  <div class="txt"><div class="t">稳血糖饮食卡</div>
+    <div class="s">吃饭顺序·三餐搭配·蛋白来源·水果坚果</div></div>
+  <div class="arrow">›</div>
+</a>
+
+<div class="divider">记录工具</div>
+
+<a class="tile app" href="index.html">
+  <div class="ico">🌡️</div>
+  <div class="txt"><div class="t">体温计 · 记录与曲线</div>
+    <div class="s">每日记录、查看曲线、数据备份</div></div>
+  <div class="arrow">›</div>
+</a>
+
+<div class="foot">
+  所有内容为自我调理参考，不替代医生面诊。<br>
+  数据只存在本机 · 确诊与用药请遵医嘱。
+</div>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#5fa38a">
+<title>一周锻炼计划</title>
+<style>
+  :root{
+    --bg:#f1f7f4; --card:#fff; --ink:#283330; --soft:#65726d;
+    --accent:#4f9e84; --accent-soft:#e4f1ec; --line:#e6efeb;
+    --leg:#5fa38a; --upper:#6b8fc0; --cardio:#c79a5a; --rest:#b9b3bd;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;padding:18px 14px 48px;max-width:580px;margin:0 auto}
+  header{text-align:center;margin:6px 0 16px}
+  header h1{font-size:21px;margin:0 0 4px;font-weight:700}
+  header p{margin:0;color:var(--soft);font-size:13px}
+  .card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 14px rgba(60,120,100,.06)}
+  .card>h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;font-weight:700}
+  .emoji{font-size:19px}
+  /* 每日必做 */
+  .anchor{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+  .anchor:first-of-type{border-top:none}
+  .anchor b{font-weight:700}
+  .anchor .ico{flex-shrink:0}
+  /* 周表 */
+  .week{display:flex;flex-direction:column;gap:8px}
+  .day{display:flex;align-items:stretch;gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .day .d-name{flex-shrink:0;width:42px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff}
+  .day .d-body{flex:1;padding:9px 11px;background:#fff}
+  .day .d-type{font-weight:700;font-size:14px}
+  .day .d-detail{font-size:12px;color:var(--soft);margin-top:2px}
+  .day .vid{display:inline-block;margin-top:6px;font-size:12px;color:#fff;font-weight:600;text-decoration:none;
+    background:var(--accent);padding:3px 11px;border-radius:20px}
+  .day .vid.alt{background:#fff;color:var(--accent);border:1.5px solid var(--accent-soft);margin-left:6px}
+  .leg .d-name{background:var(--leg)} .upper .d-name{background:var(--upper)}
+  .cardio .d-name{background:var(--cardio)} .rest .d-name{background:var(--rest)}
+  .tag{font-size:11px;color:#fff;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:1px}
+  .tag.eng{background:var(--leg)} .tag.shape{background:var(--upper)} .tag.car{background:var(--cardio)}
+  /* 动作清单 */
+  .moves{margin:0;padding-left:0;list-style:none}
+  .moves li{padding:7px 0;border-top:1px dashed var(--line);font-size:13.5px}
+  .moves li:first-child{border-top:none}
+  .moves .grp{font-weight:700;color:var(--accent)}
+  .sets{color:var(--soft);font-size:12px}
+  ul.tips{margin:4px 0;padding-left:20px}
+  ul.tips li{margin:5px 0;font-size:13.5px}
+  .ref{display:flex;gap:10px;font-size:13px;padding:8px 0;border-top:1px solid var(--line)}
+  .ref:first-of-type{border-top:none}
+  .ref b{color:var(--accent)}
+  .mantra{background:linear-gradient(135deg,#4f9e84,#6bbf9f);color:#fff;text-align:center;border-radius:18px;
+    padding:16px;font-size:14.5px;font-weight:600;line-height:1.7;box-shadow:0 4px 16px rgba(79,158,132,.28)}
+  .foot{text-align:center;color:var(--soft);font-size:12px;margin-top:16px;line-height:1.7}
+  small{color:var(--soft)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏋️‍♀️ 一周锻炼计划</h1>
+  <p>目标：增肌 · 塑形 · 改善体成分（不减重）</p>
+</header>
+
+<!-- 每日必做 -->
+<div class="card">
+  <h2><span class="emoji">📌</span>每天都做（不只是锻炼日）</h2>
+  <div class="anchor"><span class="ico">🌅</span><div><b>晨起一杯温水、规律起床</b>，唤醒一天的状态。</div></div>
+  <div class="anchor"><span class="ico">🚶‍♀️</span><div><b>三餐饭后散步 10–15 分钟</b>（尤其晚饭后），帮肌肉把血糖用掉。</div></div>
+  <div class="anchor"><span class="ico">😴</span><div><b>尽量 22:30–23:00 睡</b>、睡足 ~8 小时；皮质醇高会往肚子囤脂。</div></div>
+</div>
+
+<!-- 一周安排 -->
+<div class="card">
+  <h2><span class="emoji">📅</span>一周安排 <small style="margin-left:auto;font-weight:400">早上 7–8 点</small></h2>
+  <div class="week">
+    <div class="day leg"><div class="d-name">一</div><div class="d-body">
+      <div class="d-type">下半身力量 <span class="tag eng">引擎</span></div>
+      <div class="d-detail">腿 + 臀，~25–30 分钟｜大肌群，最能提升代谢</div>
+      <a class="vid" href="https://www.bilibili.com/video/BV1ba411s7KT/" target="_blank" rel="noopener">▶ 跟练·臀腿哑铃</a></div></div>
+    <div class="day cardio"><div class="d-name">二</div><div class="d-body">
+      <div class="d-type">轻有氧 <span class="tag car">有氧</span></div>
+      <div class="d-detail">快走 / MIZI / Jo姐，~30 分钟，轻松能说话的强度</div>
+      <a class="vid" href="https://www.bilibili.com/video/BV1JG4y1x7uG/" target="_blank" rel="noopener">▶ 跟练·MIZI站立有氧</a></div></div>
+    <div class="day upper"><div class="d-name">三</div><div class="d-body">
+      <div class="d-type">上半身 + 核心 <span class="tag shape">塑形</span></div>
+      <div class="d-detail">背、大臂、肩、肚子，~25 分钟｜练紧实、改线条</div>
+      <a class="vid" href="https://www.youtube.com/watch?v=2YpyuyREbLI" target="_blank" rel="noopener">▶ 跟练·上半身哑铃</a>
+      <a class="vid alt" href="https://www.bilibili.com/video/BV1kM4m1d7U7/" target="_blank" rel="noopener">手臂专练</a></div></div>
+    <div class="day rest"><div class="d-name">四</div><div class="d-body">
+      <div class="d-type">休息 / 拉伸</div>
+      <div class="d-detail">散步、拉伸即可；累就好好休息</div></div></div>
+    <div class="day leg"><div class="d-name">五</div><div class="d-body">
+      <div class="d-type">全身力量 <span class="tag eng">引擎</span></div>
+      <div class="d-detail">腿臀为主 + 复合动作，~30 分钟（新手先做一半）</div>
+      <a class="vid" href="https://www.bilibili.com/video/BV1vajCzMEiQ/" target="_blank" rel="noopener">▶ 跟练·全身站立哑铃</a></div></div>
+    <div class="day cardio"><div class="d-name">六</div><div class="d-body">
+      <div class="d-type">中等有氧 <span class="tag car">有氧</span></div>
+      <div class="d-detail">快走 / 骑车 / 椭圆，~30–40 分钟</div>
+      <a class="vid" href="https://www.bilibili.com/video/BV1cY4y1L7yS/" target="_blank" rel="noopener">▶ 跟练·Jo姐膝盖友好</a></div></div>
+    <div class="day rest"><div class="d-name">日</div><div class="d-body">
+      <div class="d-type">休息</div>
+      <div class="d-detail">完全休息，让身体恢复</div></div></div>
+  </div>
+  <div style="margin-top:10px"><small>共 3 次力量 + 2 次有氧 + 2 天休息。忙 / 加班那周，力量降到 2 次也没关系——<b>规律比量重要</b>。</small></div>
+</div>
+
+<!-- 力量日动作 -->
+<div class="card">
+  <h2><span class="emoji">🦵</span>力量日做什么（轻哑铃起步）</h2>
+  <ul class="moves">
+    <li><span class="grp">下半身（一）：</span>高脚杯深蹲 · 箭步蹲 · 臀桥 · 罗马尼亚硬拉 · 提踵<br><span class="sets">每个动作 2–3 组 × 10–15 次</span></li>
+    <li><span class="grp">上半身+核心（三）：</span>哑铃划船(背) · 肩上推举 · 臂屈伸(大臂) · 跪姿俯卧撑 · 平板支撑 · 死虫式<br><span class="sets">每个 2–3 组；平板撑 20–40 秒</span></li>
+    <li><span class="grp">全身（五）：</span>深蹲 + 划船 + 臀桥 + 推举 + 平板，循环 2–3 轮<br><span class="sets">把大肌群再练一遍</span></li>
+  </ul>
+</div>
+
+<!-- 原则 -->
+<div class="card">
+  <h2><span class="emoji">✅</span>关键原则</h2>
+  <ul class="tips">
+    <li><b>局部减脂不存在</b>：练大臂≠瘦大臂。脂肪全身一起掉，肚子/大臂常最后才掉，<b>要耐心</b>。</li>
+    <li><b>目标是增肌降体脂，不是掉秤</b>：别节食、别追体重，靠长肌肉让肉变紧。</li>
+    <li><b>动作标准 > 加重</b>：哑铃 1–3kg 起，先练对再加。</li>
+    <li><b>吃够蛋白质</b>：增肌减脂的关键是吃对，不是少吃。</li>
+    <li><b>别过度</b>：若加大训练后睡眠/状态变差，说明练过头，往回调。</li>
+    <li><b>身体疲惫 / 不适时</b>：想动就轻活动，累就休息，听身体的。</li>
+  </ul>
+</div>
+
+<!-- 跟练参考 -->
+<div class="card">
+  <h2><span class="emoji">📺</span>跟练参考（链接失效就用关键词搜）</h2>
+  <div class="ref"><span>💪</span><div><b>力量日(一/三/五)</b>：博主认准 <b>周六野Zoey · May Fit · fitbymik</b>；搜「哑铃 臀腿 跟练」「哑铃 上半身 肩背核心」「站立哑铃 全身」。</div></div>
+  <div class="ref"><span>🚶</span><div><b>有氧日(二/六)</b>：博主认准 <b>MIZI · Jo姐(growwithjo)</b>；搜「站立有氧 无跳跃 膝盖友好」。</div></div>
+  <div class="ref"><span>🧘</span><div><b>休息日(四)</b>：搜「睡前拉伸 10分钟」「林芊妤 拉伸」。</div></div>
+  <div class="ref"><span>⚠️</span><div>挑视频<b>看动作不看标题</b>：有负重、练肌肉的＝要；有氧日哪怕写"燃脂/HIIT"也<b>只当中等强度</b>，别追暴汗。</div></div>
+</div>
+
+<div class="mantra">
+  全身练，大肌群当引擎；<br>
+  增肌降体脂，不追秤上数字。<br>
+  吃够蛋白 + 稳血糖 + 睡好，<br>
+  肚子大臂会跟着慢慢变——给它时间。
+</div>
+
+<div class="foot">
+  以上为一般健身建议，非个体化医疗方案。<br>
+  若有基础疾病或不适，请咨询医生 / 专业教练。
+</div>
+
+</body>
+</html>
