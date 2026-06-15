@@ -479,6 +479,49 @@ window.Views = (function () {
     c.querySelector('#cycle-sel').addEventListener('change', (e) => {
       state.cycleIdx = parseInt(e.target.value, 10); chart();
     });
+    // 点曲线上某天 → 弹出当天体温/备注
+    c.querySelectorAll('.bbt-hit').forEach((el) => el.addEventListener('click', () => {
+      const ds = el.dataset.date;
+      const rec = (cycle.days || []).find((d) => d.date === ds);
+      showDayPopup(cycle, ds, rec);
+    }));
+  }
+
+  // 点曲线某天弹出的小卡：体温 + 测量时间 + 各信号 + 备注全文，可跳去编辑
+  function showDayPopup(cycle, ds, rec) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    const cd = D.diffDays(cycle.start, ds) + 1;
+    const human = D.human(ds).replace(/ 周.$/, '');
+    const tempTxt = (rec && rec.temp != null)
+      ? `${rec.temp.toFixed(2)} ℃${rec.tempTime ? ' · 测于 ' + rec.tempTime : ''}`
+      : '这天没记体温';
+    const chips = [];
+    if (rec) {
+      if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b></span>`);
+      if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
+      if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
+      if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
+    }
+    const hasNote = rec && (rec.note || '').trim();
+    overlay.innerHTML = `
+      <div class="dp-card" style="max-width:300px">
+        <div class="np-title">${human}${cd >= 1 ? ' · 周期第 ' + cd + ' 天' : ''}</div>
+        <div style="font-size:22px;font-weight:700;text-align:center;color:#ad8a86;margin:8px 0">${tempTxt}</div>
+        ${chips.length ? `<div class="sum-list" style="justify-content:center">${chips.join('')}</div>` : ''}
+        <div id="pop-note" style="display:${hasNote ? 'block' : 'none'};margin-top:10px;padding:9px 11px;background:#f7f1ee;border-radius:10px;font-size:13.5px;line-height:1.6"></div>
+        <div class="np-actions">
+          <button class="np-cancel">关闭</button>
+          <button class="np-ok" id="pop-edit">编辑这天</button>
+        </div>
+      </div>`;
+    overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+    if (hasNote) overlay.querySelector('#pop-note').textContent = '📝 ' + rec.note;
+    overlay.querySelector('.np-cancel').addEventListener('click', close);
+    overlay.querySelector('#pop-edit').addEventListener('click', () => { close(); state.date = ds; switchTo('record'); });
+    overlay.addEventListener('click', close);
   }
 
   function bindMode(c) {

@@ -17,7 +17,7 @@ window.Chart = (function () {
     let maxCD = 30;
     days.forEach((d) => { maxCD = Math.max(maxCD, D.diffDays(start, d.date) + 1); });
 
-    const col = 26, padL = 34, padR = 12, padT = 16, padB = 90;
+    const col = 26, padL = 34, padR = 12, padT = 16, padB = 104;
     const plotH = 230;
     const W = padL + padR + maxCD * col;
     const H = padT + plotH + padB;
@@ -100,12 +100,13 @@ window.Chart = (function () {
     // —— 底部标记行：每种标记各占一行，避免同一天叠在一起 ——
     const my = padT + plotH + 22;
     const laneH = 14;
-    const lane = { period: my, lh: my + laneH, mucus: my + 2 * laneH, sex: my + 3 * laneH };
+    const lane = { period: my, lh: my + laneH, mucus: my + 2 * laneH, sex: my + 3 * laneH, note: my + 4 * laneH };
     // 行首小标签，提示每行是什么
     svg += `<text x="${padL - 6}" y="${lane.period + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">经</text>`;
     svg += `<text x="${padL - 6}" y="${lane.lh + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">纸</text>`;
     svg += `<text x="${padL - 6}" y="${lane.mucus + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">液</text>`;
     svg += `<text x="${padL - 6}" y="${lane.sex + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">房</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.note + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">备</text>`;
     for (let cd = 1; cd <= maxCD; cd++) {
       const d = byCD[cd]; if (!d) continue;
       const xx = x(cd);
@@ -113,6 +114,13 @@ window.Chart = (function () {
       if (d.lh === 'strong') { svg += `<polygon points="${xx},${lane.lh - 5} ${xx + 5},${lane.lh + 4} ${xx - 5},${lane.lh + 4}" fill="#8ea1a6"/>`; }
       if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${lane.mucus - 5} ${xx + 5},${lane.mucus} ${xx},${lane.mucus + 5} ${xx - 5},${lane.mucus}" fill="#9aa890"/>`; }
       if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${lane.sex - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
+      if ((d.note || '').trim()) { svg += `<circle cx="${xx}" cy="${lane.note}" r="3.5" fill="#c79a5a"/>`; }
+    }
+
+    // —— 透明点击热区：点某天那一列 → 弹出当天体温/备注（在 views.js 绑定）——
+    for (let cd = 1; cd <= maxCD; cd++) {
+      const d = byCD[cd]; if (!d) continue;
+      svg += `<rect class="bbt-hit" x="${x(cd) - col / 2}" y="${padT}" width="${col}" height="${H - padT - 2}" fill="transparent" data-date="${d.date}" style="cursor:pointer"/>`;
     }
 
     svg += `</svg>`;
@@ -131,6 +139,8 @@ window.Chart = (function () {
       <span>${I.tri(11, '#8ea1a6')} 试纸强阳(纸)</span>
       <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜(液)</span>
       <span>${I.heart(12, '#ad8a86')} 同房(房)</span>
+      <span><i class="dot" style="background:#c79a5a"></i>当天有备注(备)</span>
+      <span style="width:100%;color:#bbb">👆点曲线上某一天，可看当天体温、测量时间和备注全文</span>
       <span style="width:100%;color:#bbb">没有覆盖线时看基线：点落在基线上方＝体温偏高（可能已升温），下方＝偏低</span>
     </div>`;
   }
