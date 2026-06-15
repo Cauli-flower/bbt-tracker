@@ -17,7 +17,7 @@ window.Chart = (function () {
     let maxCD = 30;
     days.forEach((d) => { maxCD = Math.max(maxCD, D.diffDays(start, d.date) + 1); });
 
-    const col = 26, padL = 34, padR = 12, padT = 16, padB = 40;
+    const col = 26, padL = 34, padR = 12, padT = 16, padB = 90;
     const plotH = 230;
     const W = padL + padR + maxCD * col;
     const H = padT + plotH + padB;
@@ -64,11 +64,19 @@ window.Chart = (function () {
     }
     svg += `<text x="${padL}" y="${H - 4}" font-size="10" fill="#bbb">周期第几天 →</text>`;
 
-    // —— 覆盖线 ——
+    // —— 覆盖线（已判定排卵时）/ 基线（未判定时画平均值，便于看高于/低于平时）——
     if (a.coverline) {
       const yy = y(a.coverline);
       svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#ad8a86" stroke-width="1.5" stroke-dasharray="5 4"/>`;
       svg += `<text x="${W - padR}" y="${yy - 5}" font-size="10" fill="#ad8a86" text-anchor="end">覆盖线 ${a.coverline.toFixed(2)}</text>`;
+    } else {
+      const tp = a.tempPoints || [];
+      if (tp.length >= 3) {
+        const mean = tp.reduce((s, p) => s + p.temp, 0) / tp.length;
+        const yy = y(mean);
+        svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#bdb5b2" stroke-width="1.3" stroke-dasharray="3 4"/>`;
+        svg += `<text x="${W - padR}" y="${yy - 5}" font-size="10" fill="#a89f9c" text-anchor="end">基线 ${mean.toFixed(2)}</text>`;
+      }
     }
 
     // —— 排卵日竖线 ——
@@ -89,16 +97,22 @@ window.Chart = (function () {
       });
     }
 
-    // —— 底部标记行：经期/试纸/黏液/同房 ——
-    const my = padT + plotH + 24;
+    // —— 底部标记行：每种标记各占一行，避免同一天叠在一起 ——
+    const my = padT + plotH + 22;
+    const laneH = 14;
+    const lane = { period: my, lh: my + laneH, mucus: my + 2 * laneH, sex: my + 3 * laneH };
+    // 行首小标签，提示每行是什么
+    svg += `<text x="${padL - 6}" y="${lane.period + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">经</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.lh + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">纸</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.mucus + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">液</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.sex + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">房</text>`;
     for (let cd = 1; cd <= maxCD; cd++) {
       const d = byCD[cd]; if (!d) continue;
       const xx = x(cd);
-      let dy = my;
-      if (window.Cycle.isPeriod(d)) { svg += `<circle cx="${xx}" cy="${dy}" r="4" fill="#ad8a86"/>`; }
-      if (d.lh === 'strong') { svg += `<polygon points="${xx},${dy - 5} ${xx + 5},${dy + 4} ${xx - 5},${dy + 4}" fill="#8ea1a6"/>`; }
-      if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${dy - 5} ${xx + 5},${dy} ${xx},${dy + 5} ${xx - 5},${dy}" fill="#9aa890"/>`; }
-      if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${dy - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
+      if (window.Cycle.isPeriod(d)) { svg += `<circle cx="${xx}" cy="${lane.period}" r="4" fill="#ad8a86"/>`; }
+      if (d.lh === 'strong') { svg += `<polygon points="${xx},${lane.lh - 5} ${xx + 5},${lane.lh + 4} ${xx - 5},${lane.lh + 4}" fill="#8ea1a6"/>`; }
+      if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${lane.mucus - 5} ${xx + 5},${lane.mucus} ${xx},${lane.mucus + 5} ${xx - 5},${lane.mucus}" fill="#9aa890"/>`; }
+      if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${lane.sex - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
     }
 
     svg += `</svg>`;
@@ -112,10 +126,12 @@ window.Chart = (function () {
       <span><i class="dot" style="background:#8ea1a6"></i>排卵日 / 高温相</span>
       <span><i class="dot" style="background:#9aa890"></i>易孕窗口</span>
       <span style="color:#ad8a86">— — 覆盖线</span>
-      <span><i class="dot" style="background:#ad8a86"></i>经期</span>
-      <span>${I.tri(11, '#8ea1a6')} 试纸强阳</span>
-      <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜（最易孕）</span>
-      <span>${I.heart(12, '#ad8a86')} 同房</span>
+      <span style="color:#a89f9c">— — 基线(平均)</span>
+      <span><i class="dot" style="background:#ad8a86"></i>经期(经)</span>
+      <span>${I.tri(11, '#8ea1a6')} 试纸强阳(纸)</span>
+      <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜(液)</span>
+      <span>${I.heart(12, '#ad8a86')} 同房(房)</span>
+      <span style="width:100%;color:#bbb">没有覆盖线时看基线：点落在基线上方＝体温偏高（可能已升温），下方＝偏低</span>
     </div>`;
   }
 

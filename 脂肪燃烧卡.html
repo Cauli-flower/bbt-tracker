@@ -58,6 +58,9 @@
     border-top:1px dashed var(--line);padding-top:10px}
   .chk-note b{color:var(--c-d)}
   .btn.saved-btn{background:#dde7e3;color:#3f7a63}
+  .btn.ghost{background:#f0f3f4;color:#7a8a8d}
+  #back-today{margin-left:auto;border:none;background:var(--soft-c);color:var(--c-d);
+    font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px;cursor:pointer}
 
   /* 本月日历 */
   .mo-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -80,6 +83,10 @@
   .mo-cell.partial{background:#f0e0c2;color:#a9803f;font-weight:700}
   .mo-cell.miss{background:#eef1f2;color:#b9c2c5}
   .mo-cell.today{box-shadow:0 0 0 2px var(--c)}
+  .mo-cell.clk{cursor:pointer}
+  .mo-cell.clk:active{transform:scale(.92)}
+  .mo-hint{font-size:11.5px;color:var(--soft);margin-top:12px;line-height:1.6;
+    border-top:1px dashed var(--line);padding-top:10px}
 
   /* 补剂展开 */
   .supp-wrap{border-top:1px solid var(--line)}
@@ -156,11 +163,12 @@
 <div class="streak" id="streak"></div>
 
 <!-- 今日打卡 -->
-<div class="card">
-  <h2><span class="emoji">✅</span>今日打卡 <span class="hint" id="today-label"></span></h2>
+<div class="card" id="checklist-card">
+  <h2><span class="emoji">✅</span><span id="chk-title">今日打卡</span> <span class="hint" id="today-label"></span><button id="back-today" style="display:none">↩ 回到今天</button></h2>
   <div id="checklist"></div>
-  <div class="chk-note">默认当天都做到 ✓，<b>没做到的点掉即可</b>。补剂会自动沿用你上次的勾选。<br>调整好后点下面保存，<b>这天才算数</b>——没保存的天记为「未记录」。</div>
+  <div class="chk-note">默认都做到 ✓，<b>没做到的点掉即可</b>。补剂会自动沿用你上次的勾选。<br>调整好后点下面保存，<b>这天才算数</b>——没保存的天记为「未记录」。</div>
   <button class="btn" id="day-save" style="margin-top:12px">保存今日打卡</button>
+  <button class="btn ghost" id="day-clear" style="display:none;margin-top:8px">清除这天记录</button>
 </div>
 
 <!-- 本月完成情况 -->
@@ -245,6 +253,7 @@
   sortWeekly();
   var suppOpen = false;
   var viewMonth = null; // 本月日历当前查看的 YYYY-MM
+  var editDate = null;  // 当前在打卡清单里编辑的日期（默认今天，可补记往日）
 
   function sortWeekly() {
     state.weekly.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
@@ -274,9 +283,9 @@
     var keys = Object.keys(state.days).filter(function (d) { return d < ds; }).sort();
     return keys.length ? state.days[keys[keys.length - 1]] : null;
   }
-  // 新的一天：每日项默认「已做到」（取消未做的即可）；补剂承接上一天勾选；confirmed=未保存
-  function makeNewDay() {
-    var prev = lastRecordedBefore(TODAY);
+  // 某天的默认：每日项默认「已做到」（取消未做的即可）；补剂承接上一天勾选；confirmed=未保存
+  function makeNewDay(ds) {
+    var prev = lastRecordedBefore(ds);
     var supps = (prev && prev.supps) ? Object.assign({}, prev.supps) : {};
     return { move: true, exercise: true, sleep: true, diet: true, supps: supps, confirmed: false };
   }
@@ -319,7 +328,12 @@
   }
 
   function renderChecklist() {
-    var rec = day(TODAY);
+    if (!state.days[editDate]) state.days[editDate] = makeNewDay(editDate);
+    var rec = state.days[editDate];
+    var isToday = (editDate === TODAY);
+    document.getElementById('chk-title').textContent = isToday ? '今日打卡' : '补记打卡';
+    document.getElementById('today-label').textContent = humanDay(editDate);
+    document.getElementById('back-today').style.display = isToday ? 'none' : '';
     var html = '';
     DAILY.forEach(function (it) {
       var on = rec[it.k];
@@ -337,7 +351,7 @@
       '<div class="supp-head' + cls + '" id="supp-head">' +
         '<div class="box">' + mark + '</div>' +
         '<div class="t"><b>补剂</b></div>' +
-        '<span class="badge">今天 ' + took + '/' + SUPPS.length + '</span>' +
+        '<span class="badge">' + took + '/' + SUPPS.length + '</span>' +
         '<span class="caret">▾</span>' +
       '</div>' +
       '<div class="supp-list">';
@@ -487,13 +501,15 @@
     for (var d = 1; d <= dim; d++) {
       var ds = y + '-' + pad(m) + '-' + pad(d);
       var cls = 'mo-cell';
+      var clickable = '';
       if (ds > TODAY) { cls += ' future'; }
       else {
-        var st = dayStatus(ds); cls += ' ' + st;
+        var st = dayStatus(ds); cls += ' ' + st + ' clk';
+        clickable = ' data-d="' + ds + '"';
         if (st === 'done') done++; else if (st === 'partial') partial++; else miss++;
       }
       if (ds === TODAY) cls += ' today';
-      cells += '<div class="' + cls + '">' + d + '</div>';
+      cells += '<div class="' + cls + '"' + clickable + '>' + d + '</div>';
     }
     var wd = ['日', '一', '二', '三', '四', '五', '六'].map(function (w) { return '<div class="mo-wd">' + w + '</div>'; }).join('');
     document.getElementById('month-body').innerHTML =
@@ -505,25 +521,53 @@
         '<div class="mo-stat partial"><div class="n">' + partial + '</div><div class="l">差一点</div></div>' +
         '<div class="mo-stat miss"><div class="n">' + miss + '</div><div class="l">未记录</div></div>' +
       '</div>' +
-      '<div class="mo-grid">' + wd + cells + '</div>';
+      '<div class="mo-grid">' + wd + cells + '</div>' +
+      '<div class="mo-hint">💡 忘了打卡？点日历上任意一天，可补记或修改那天的完成情况。</div>';
     document.getElementById('mo-prev').addEventListener('click', function () { viewMonth = shiftMonth(ym, -1); renderMonth(); });
     if (!atMax) document.getElementById('mo-next').addEventListener('click', function () { viewMonth = shiftMonth(ym, 1); renderMonth(); });
+    document.querySelectorAll('#month-body .mo-cell.clk').forEach(function (el) {
+      el.addEventListener('click', function () { openDay(el.dataset.d); });
+    });
+  }
+
+  // 点日历某天：把那天载入上面的打卡清单里编辑（可记成完成或部分完成）
+  function openDay(ds) {
+    editDate = ds;
+    if (!state.days[ds]) state.days[ds] = makeNewDay(ds);
+    renderChecklist(); renderDaySaveBtn();
+    document.getElementById('checklist-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function renderDaySaveBtn() {
+    var isToday = (editDate === TODAY);
+    var r = state.days[editDate];
     var b = document.getElementById('day-save');
-    var r = state.days[TODAY];
-    if (r && r.confirmed) { b.textContent = '✓ 今日已打卡（点可更新）'; b.classList.add('saved-btn'); }
-    else { b.textContent = '保存今日打卡'; b.classList.remove('saved-btn'); }
+    if (r && r.confirmed) { b.textContent = '✓ 已保存（点可更新）'; b.classList.add('saved-btn'); }
+    else { b.textContent = isToday ? '保存今日打卡' : '保存这天打卡'; b.classList.remove('saved-btn'); }
+    // 清除按钮：仅当这天已有确认记录时显示
+    document.getElementById('day-clear').style.display = (r && r.confirmed) ? '' : 'none';
   }
 
   function commit() { save(state); }
 
-  /* ---------- 今日打卡保存 ---------- */
+  /* ---------- 打卡保存 / 清除（针对当前编辑的日期）---------- */
   document.getElementById('day-save').addEventListener('click', function () {
-    var r = day(TODAY); r.confirmed = true; commit();
+    if (!state.days[editDate]) state.days[editDate] = makeNewDay(editDate);
+    state.days[editDate].confirmed = true; commit();
     renderDaySaveBtn(); renderStreak(); renderMonth();
-    toast('今日已打卡 ✓');
+    toast(editDate === TODAY ? '今日已打卡 ✓' : '已补记 ' + humanDay(editDate) + ' ✓');
+  });
+
+  document.getElementById('back-today').addEventListener('click', function () { openDay(TODAY); });
+
+  document.getElementById('day-clear').addEventListener('click', function () {
+    if (!confirm('清除 ' + humanDay(editDate) + ' 的记录吗？')) return;
+    delete state.days[editDate];
+    commit();
+    editDate = TODAY;
+    if (!state.days[TODAY]) state.days[TODAY] = makeNewDay(TODAY);
+    renderChecklist(); renderDaySaveBtn(); renderStreak(); renderMonth();
+    toast('已清除');
   });
 
   /* ---------- 每周保存 ---------- */
@@ -558,10 +602,10 @@
   /* ---------- 初始 ---------- */
   // 今天若还没记录：在内存里铺好默认（每日项已做到 + 承接补剂），但不落盘；
   // 只有点「保存今日打卡」才确认计数，避免忘了就被当成全做到。
-  if (!state.days[TODAY]) state.days[TODAY] = makeNewDay();
+  editDate = TODAY;
+  if (!state.days[TODAY]) state.days[TODAY] = makeNewDay(TODAY);
   viewMonth = TODAY.slice(0, 7);
 
-  document.getElementById('today-label').textContent = humanDay(TODAY);
   var wkDate = document.getElementById('wk-date');
   wkDate.max = TODAY; wkDate.value = TODAY;
   renderStreak();
