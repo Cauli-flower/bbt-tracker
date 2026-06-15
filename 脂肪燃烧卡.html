@@ -107,7 +107,8 @@
   .supp.on .dot{background:var(--c);border-color:var(--c)}
   .supp .sn{flex:1;font-size:14px}
   .supp.on .sn{color:var(--c-d);font-weight:600}
-  .supp .sd{font-size:11.5px;color:var(--soft);flex-shrink:0}
+  .supp .sd{font-size:11.5px;color:var(--c);flex-shrink:0}
+  .supp-note{font-size:11.5px;color:var(--soft);line-height:1.6;padding:8px 6px 2px;border-top:1px dashed var(--line-dash)}
 
   /* 每周记录 */
   .wk-row{display:flex;gap:10px;margin-bottom:10px}
@@ -236,10 +237,10 @@
     { k: 'diet',     n: '少糖少精制碳水',     d: '管住嘴，帮着减肚子' },
   ];
   var SUPPS = [
-    { k: 'multivit',  n: '复合维（善存男士）', d: '打底' },
-    { k: 'coq10',     n: '辅酶 Q10',      d: '代谢' },
-    { k: 'lycopene',  n: '番茄红素',       d: '抗氧化' },
-    { k: 'omega3',    n: 'Omega-3 鱼油',  d: '心血管' },
+    { k: 'multivit',  n: '复合维（善存男士）', d: '1粒·随早餐' },
+    { k: 'coq10',     n: '辅酶 Q10',      d: '随餐' },
+    { k: 'lycopene',  n: '番茄红素',       d: '随餐' },
+    { k: 'omega3',    n: 'Omega-3 鱼油',  d: '随餐' },
   ];
 
   /* ---------- 数据 ---------- */
@@ -363,6 +364,7 @@
         '<div class="sd">' + sp.d + '</div>' +
         '</div>';
     });
+    html += '<div class="supp-note">💡 都随餐吃，饭里带点油脂更好吸收；复合维每天 1 粒，其余按产品说明的量。</div>';
     html += '</div></div>';
 
     var cl = document.getElementById('checklist');
