@@ -31,20 +31,28 @@ window.Chart = (function () {
 
     let svg = `<svg id="bbt-chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
 
-    // —— 高温相底色（排卵升温日到周期末）——
-    if (a.ovuCD) {
-      const riseCD = a.ovuCD + 1;
-      const x0 = x(riseCD) - col / 2;
-      svg += `<rect x="${x0}" y="${padT}" width="${W - padR - x0}" height="${plotH}" fill="#dde3e2" opacity="0.5"/>`;
+    // —— 易孕窗口底色（排卵前几天 ~ 排卵日；暖粉色，与高温相明显区分）——
+    if (a.fertileWindow) {
+      const fs = Math.max(1, D.diffDays(start, a.fertileWindow.start) + 1);
+      let fe = D.diffDays(start, a.fertileWindow.end) + 1;
+      if (a.ovuCD) fe = Math.min(fe, a.ovuCD); // 视觉上截到排卵日，避免和高温相叠成深块、也避免看着像窗口在排卵后
+      const fx0 = x(fs) - col / 2;
+      const fx1 = x(Math.min(maxCD, fe)) + col / 2;
+      if (fx1 > fx0) {
+        svg += `<rect x="${fx0}" y="${padT}" width="${fx1 - fx0}" height="${plotH}" fill="#e8cfc8" opacity="0.55"/>`;
+        svg += `<text x="${(fx0 + fx1) / 2}" y="${padT + 12}" font-size="10" fill="#b07f76" text-anchor="middle" font-weight="600">易孕窗口</text>`;
+      }
     }
 
-    // —— 易孕窗口底色 ——
-    if (a.fertileWindow) {
-      const fs = D.diffDays(start, a.fertileWindow.start) + 1;
-      const fe = D.diffDays(start, a.fertileWindow.end) + 1;
-      const x0 = x(Math.max(1, fs)) - col / 2;
-      const x1 = x(Math.min(maxCD, fe)) + col / 2;
-      svg += `<rect x="${x0}" y="${padT}" width="${Math.max(0, x1 - x0)}" height="${plotH}" fill="#9aa890" opacity="0.16"/>`;
+    // —— 高温相底色（排卵升温日到周期末；冷灰绿，与易孕窗口明显区分）——
+    if (a.ovuCD) {
+      const riseCD = a.ovuCD + 1;
+      const hx0 = x(riseCD) - col / 2;
+      const hx1 = W - padR;
+      if (hx1 > hx0) {
+        svg += `<rect x="${hx0}" y="${padT}" width="${hx1 - hx0}" height="${plotH}" fill="#d3e0de" opacity="0.6"/>`;
+        svg += `<text x="${(hx0 + hx1) / 2}" y="${padT + 12}" font-size="10" fill="#6f8a86" text-anchor="middle" font-weight="600">高温相</text>`;
+      }
     }
 
     // —— 横向网格线 + 温度标签 ——
@@ -72,10 +80,14 @@ window.Chart = (function () {
     } else {
       const tp = a.tempPoints || [];
       if (tp.length >= 3) {
-        const mean = tp.reduce((s, p) => s + p.temp, 0) / tp.length;
-        const yy = y(mean);
+        // 基线锚定在「低温相」：取最低的若干天求平均，不把高温相算进去，
+        // 这样基线不会随升温往上漂，高温区始终清楚（类似 Apple Watch 固定基线 / BBT 覆盖线的思路）
+        const sorted = tp.map((p) => p.temp).sort((a, b) => a - b);
+        const k = Math.min(6, sorted.length);
+        const baseT = sorted.slice(0, k).reduce((s, t) => s + t, 0) / k;
+        const yy = y(baseT);
         svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#bdb5b2" stroke-width="1.3" stroke-dasharray="3 4"/>`;
-        svg += `<text x="${W - padR}" y="${yy - 5}" font-size="10" fill="#a89f9c" text-anchor="end">基线 ${mean.toFixed(2)}</text>`;
+        svg += `<text x="${W - padR}" y="${yy - 5}" font-size="10" fill="#a89f9c" text-anchor="end">基线 ${baseT.toFixed(2)}</text>`;
       }
     }
 
@@ -131,17 +143,19 @@ window.Chart = (function () {
     const I = window.Icons;
     return `<div class="legend">
       <span><i class="dot" style="background:#ad8a86"></i>体温曲线</span>
-      <span><i class="dot" style="background:#8ea1a6"></i>排卵日 / 高温相</span>
-      <span><i class="dot" style="background:#9aa890"></i>易孕窗口</span>
+      <span><i class="dot" style="background:#8ea1a6"></i>排卵日(竖线)</span>
+      <span><i class="dot" style="background:#e0bdb4"></i>易孕窗口(暖·排卵前)</span>
+      <span><i class="dot" style="background:#bcd2ce"></i>高温相(冷·排卵后)</span>
+      <span style="width:100%;color:#bbb">易孕窗口在排卵线左侧(排卵前几天最易孕)，高温相在右侧(已排卵的黄体期)</span>
       <span style="color:#ad8a86">— — 覆盖线</span>
-      <span style="color:#a89f9c">— — 基线(平均)</span>
+      <span style="color:#a89f9c">— — 基线(低温相)</span>
       <span><i class="dot" style="background:#ad8a86"></i>经期(经)</span>
       <span>${I.tri(11, '#8ea1a6')} 试纸强阳(纸)</span>
       <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜(液)</span>
       <span>${I.heart(12, '#ad8a86')} 同房(房)</span>
       <span><i class="dot" style="background:#c79a5a"></i>当天有备注(备)</span>
       <span style="width:100%;color:#bbb">👆点曲线上某一天，可看当天体温、测量时间和备注全文</span>
-      <span style="width:100%;color:#bbb">没有覆盖线时看基线：点落在基线上方＝体温偏高（可能已升温），下方＝偏低</span>
+      <span style="width:100%;color:#bbb">基线＝你低温相的水平(不随高温漂移)；体温明显升到基线上方、且连续几天＝可能已排卵升温</span>
     </div>`;
   }
 
