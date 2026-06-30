@@ -436,7 +436,7 @@ window.Views = (function () {
     const a = analyses[idx];
 
     const options = cycles.map((cy) => {
-      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.isOpen ? '·进行中' : ''}）`;
+      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}）`;
       return `<option value="${cy.index}" ${cy.index === idx ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
@@ -451,7 +451,11 @@ window.Views = (function () {
     c.innerHTML = modeBar + `
       <div class="cycle-switch">
         <span class="muted">查看周期</span>
-        <select id="cycle-sel">${options}</select>
+        <div class="cyc-nav">
+          <button id="cyc-prev" class="cyc-arrow" ${idx === cycles[0].index ? 'disabled' : ''} aria-label="上一周期" title="上一周期">‹</button>
+          <select id="cycle-sel">${options}</select>
+          <button id="cyc-next" class="cyc-arrow" ${idx === cycles[cycles.length - 1].index ? 'disabled' : ''} aria-label="下一周期" title="下一周期">›</button>
+        </div>
       </div>
 
       <div class="verdict ${vClass}">
@@ -479,6 +483,12 @@ window.Views = (function () {
     c.querySelector('#cycle-sel').addEventListener('change', (e) => {
       state.cycleIdx = parseInt(e.target.value, 10); chart();
     });
+    // ‹ 上一周期 / 下一周期 › 一键切换
+    const ordered = cycles.map((x) => x.index);
+    const pos = ordered.indexOf(idx);
+    const prevB = c.querySelector('#cyc-prev'), nextB = c.querySelector('#cyc-next');
+    if (prevB) prevB.addEventListener('click', () => { if (pos > 0) { state.cycleIdx = ordered[pos - 1]; chart(); } });
+    if (nextB) nextB.addEventListener('click', () => { if (pos < ordered.length - 1) { state.cycleIdx = ordered[pos + 1]; chart(); } });
     // 点曲线上某天 → 弹出当天体温/备注
     c.querySelectorAll('.bbt-hit').forEach((el) => el.addEventListener('click', () => {
       const ds = el.dataset.date;

@@ -60,11 +60,17 @@ window.Cycle = (function () {
       // 还没记录过经期开始：把全部记录当成一个"未定起点"的周期，仍可画曲线
       cycles.push({ index: 1, start: days[0].date, end: lastDate, isOpen: true, noPeriodStart: true });
     } else {
+      let n = 0;
+      // 首个经期开始日之前还有数据（起点未记录的那段，常见于刚开始用 app、没补记上次月经）：
+      // 单独保留成一个"已结束·起点未记录"的周期，避免标记新月经后这段历史曲线丢失。
+      if (days[0].date < starts[0]) {
+        cycles.push({ index: ++n, start: days[0].date, end: D.addDays(starts[0], -1), isOpen: false, noPeriodStart: true });
+      }
       for (let i = 0; i < starts.length; i++) {
         const start = starts[i];
         const isOpen = i === starts.length - 1;
         const end = isOpen ? lastDate : D.addDays(starts[i + 1], -1);
-        cycles.push({ index: i + 1, start, end, isOpen });
+        cycles.push({ index: ++n, start, end, isOpen });
       }
     }
 
@@ -212,7 +218,9 @@ window.Cycle = (function () {
   function cycleStats(cycles, settings) {
     settings = settings || { avgCycle: 28, avgLuteal: 14 };
     const completed = cycles.filter((c) => !c.isOpen && c.nextStart);
-    const lengths = completed.map((c) => D.diffDays(c.start, c.nextStart));
+    // 周期长度统计只用"起点确定"的完整周期；起点未记录那段长度不准，排除
+    const realCompleted = completed.filter((c) => !c.noPeriodStart);
+    const lengths = realCompleted.map((c) => D.diffDays(c.start, c.nextStart));
     const lutealLens = [];
     completed.forEach((c) => { const a = analyzeCycle(c); if (a.lutealLength && a.ovulationConfirmed) lutealLens.push(a.lutealLength); });
 
@@ -226,7 +234,7 @@ window.Cycle = (function () {
 
     const stats = {
       avgCycle, avgLuteal, minCycle, maxCycle, stddev: Math.round(sd * 10) / 10,
-      recordedCycles: completed.length,
+      recordedCycles: realCompleted.length,
       lengths, irregular,
       nextPeriod: null, nextPeriodRange: null,
       predictedOvulation: null,

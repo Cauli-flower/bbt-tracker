@@ -2,7 +2,7 @@
  * service-worker.js — 离线缓存（只缓存程序文件，不碰用户数据；数据在 IndexedDB）
  * 改动代码后，把 CACHE 版本号 +1，旧缓存会自动清理。
  */
-const CACHE = 'thermo-v7';
+const CACHE = 'thermo-v8';
 const ASSETS = [
   './',
   './index.html',

@@ -284,6 +284,13 @@ textarea {
   border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 14px;
   background: #fff; color: var(--ink);
 }
+.cyc-nav { display: flex; align-items: center; gap: 8px; }
+.cyc-arrow {
+  border: 1.5px solid var(--line); background: #fff; color: var(--pink);
+  width: 34px; height: 34px; border-radius: 10px; font-size: 20px; line-height: 1;
+  cursor: pointer; flex: none;
+}
+.cyc-arrow:disabled { opacity: .35; cursor: default; }
 
 /* ---------- 日历 ---------- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
