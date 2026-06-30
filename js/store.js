@@ -18,8 +18,9 @@
  */
 window.Store = (function () {
   const DB_NAME = 'thermo-db';
-  const DB_VER = 1;
+  const DB_VER = 2;
   const STORE = 'days';
+  const PHOTOS = 'lhphotos';        // 试纸照片：{ date, img(压缩后的dataURL) }
   const SETTINGS_KEY = 'thermo-settings';
 
   let _db = null;
@@ -33,14 +34,18 @@ window.Store = (function () {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'date' });
         }
+        if (!db.objectStoreNames.contains(PHOTOS)) {
+          db.createObjectStore(PHOTOS, { keyPath: 'date' });
+        }
       };
       req.onsuccess = () => { _db = req.result; resolve(_db); };
       req.onerror = () => reject(req.error);
     });
   }
 
-  function tx(mode) {
-    return open().then((db) => db.transaction(STORE, mode).objectStore(STORE));
+  function tx(mode, store) {
+    store = store || STORE;
+    return open().then((db) => db.transaction(store, mode).objectStore(store));
   }
 
   // 读取某一天（不存在则返回 null）
@@ -78,6 +83,37 @@ window.Store = (function () {
         const list = (r.result || []).sort((a, b) => a.date < b.date ? -1 : 1);
         res(list);
       };
+      r.onerror = () => rej(r.error);
+    }));
+  }
+
+  // ---------- 试纸照片 ----------
+  function putPhoto(date, img) {
+    return tx('readwrite', PHOTOS).then((os) => new Promise((res, rej) => {
+      const r = os.put({ date, img });
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    }));
+  }
+  function getPhoto(date) {
+    return tx('readonly', PHOTOS).then((os) => new Promise((res, rej) => {
+      const r = os.get(date);
+      r.onsuccess = () => res(r.result ? r.result.img : null);
+      r.onerror = () => rej(r.error);
+    }));
+  }
+  function deletePhoto(date) {
+    return tx('readwrite', PHOTOS).then((os) => new Promise((res, rej) => {
+      const r = os.delete(date);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    }));
+  }
+  // 取全部照片，返回 { date: img } 映射
+  function allPhotos() {
+    return tx('readonly', PHOTOS).then((os) => new Promise((res, rej) => {
+      const r = os.getAll();
+      r.onsuccess = () => { const m = {}; (r.result || []).forEach((p) => { m[p.date] = p.img; }); res(m); };
       r.onerror = () => rej(r.error);
     }));
   }
@@ -126,17 +162,20 @@ window.Store = (function () {
     }));
   }
 
-  // 清空全部（设置页"重置"用）
+  // 清空全部（设置页"重置"用）：每日记录 + 试纸照片一起清
   function clearAll() {
-    return tx('readwrite').then((os) => new Promise((res, rej) => {
-      const r = os.clear();
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
+    return open().then((db) => new Promise((res, rej) => {
+      const t = db.transaction([STORE, PHOTOS], 'readwrite');
+      t.objectStore(STORE).clear();
+      t.objectStore(PHOTOS).clear();
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
     }));
   }
 
   return {
     getDay, putDay, deleteDay, allDays,
+    putPhoto, getPhoto, deletePhoto, allPhotos,
     getSettings, saveSettings,
     exportAll, importAll, clearAll,
   };

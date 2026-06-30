@@ -26,7 +26,41 @@ window.Views = (function () {
 
   // 已保存内容清单（基于真正存入的记录，便于确认存没存上、存了哪些项）
   const PERIOD_L = { light: '少', medium: '中', heavy: '多' };
-  const LH_L = { negative: '阴性', weak: '弱阳', strong: '强阳', fading: '转弱' };
+  const LH_L = { negative: '阴', faint: '浅', medium: '中', near: '接近', strong: '强阳', weak: '弱阳', fading: '转弱' };
+  const LH_MIGRATE = { weak: 'faint', fading: 'near' }; // 旧3档值映射到新深浅阶梯，便于高亮按钮
+  // 最近几天试纸照片排一排（前6天+今天），方便直接对比深浅；空缺显示占位
+  function photoStripHTML(photoMap, curDate) {
+    const cols = [];
+    for (let i = 6; i >= 0; i--) {
+      const ds = D.addDays(curDate, -i);
+      const isToday = i === 0;
+      const img = photoMap[ds];
+      const mm = isToday ? '今' : ds.slice(5).replace('-', '/');
+      const inner = img
+        ? `<img class="lh-thumb" src="${img}" data-date="${ds}" alt="${ds}">`
+        : `<div class="lh-thumb empty" data-date="${ds}">${isToday ? '＋' : '·'}</div>`;
+      cols.push(`<div class="lh-pcol${isToday ? ' today' : ''}">${inner}<span class="lh-pday">${mm}</span></div>`);
+    }
+    return cols.join('');
+  }
+  // 压缩图片到 dataURL（宽≤maxW，JPEG），避免占太多本地存储
+  function compressImage(file, maxW, cb) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { cb(cv.toDataURL('image/jpeg', 0.75)); } catch (e) { cb(reader.result); }
+      };
+      img.onerror = () => cb(reader.result);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
   const MUCUS_L = { dry: '干', wet: '湿润', slippery: '滑溜', sticky: '黏稠', creamy: '乳白', eggwhite: '蛋清拉丝' };
   function daySummaryHTML(rec) {
     if (!rec || isEmpty(rec)) return '<div class="sum-empty">这一天还没有保存任何记录。填好后记得点下面「保存」。</div>';
@@ -222,10 +256,12 @@ window.Views = (function () {
     const date = state.date;
     const saved = await Store.getDay(date);
     _cur = Object.assign(blank(date), saved || {});
+    if (LH_MIGRATE[_cur.lh]) _cur.lh = LH_MIGRATE[_cur.lh]; // 旧试纸值映射到新深浅阶梯
 
     const yDate = D.addDays(date, -1);
     const ySaved = await Store.getDay(yDate);
     const yHas = !!(ySaved && ySaved.intercourse);
+    const photoMap = await Store.allPhotos(); // 试纸照片 { date: img }
 
     const isToday = date === D.todayStr();
     const c = $app();
@@ -278,9 +314,16 @@ window.Views = (function () {
         <div class="field">
           <label>排卵试纸 LH</label>
           ${seg('lh', 'lh', [
-            { v: 'none', label: '未测' }, { v: 'negative', label: '阴性' },
-            { v: 'weak', label: '弱阳' }, { v: 'strong', label: '强阳' }, { v: 'fading', label: '转弱' },
+            { v: 'none', label: '未测' }, { v: 'negative', label: '阴' },
+            { v: 'faint', label: '浅' }, { v: 'medium', label: '中' },
+            { v: 'near', label: '接近' }, { v: 'strong', label: '强阳' },
           ], _cur.lh)}
+          <div class="lh-cap-row">
+            <button type="button" id="lh-cam-btn" class="lh-cap-btn">📷 拍试纸（不进相册）</button>
+            <label class="lh-cap-btn ghost">从相册选<input type="file" id="lh-photo-input" accept="image/*" hidden></label>
+          </div>
+          <div id="lh-photo-strip" class="lh-strip">${photoStripHTML(photoMap, date)}</div>
+          <div class="sub" style="margin-top:8px">「拍试纸」在 app 内直接拍，<b>只进 app、不进手机相册</b>。下面按日期排好，直接比"今天比昨天深还是浅"，再点上面的深浅；点照片可放大、和前一天并排对比。</div>
         </div>
         <div class="field">
           <label>宫颈黏液 <span class="sub">不会看分泌物？凭感觉选「湿润 / 滑溜」就行</span></label>
@@ -361,6 +404,99 @@ window.Views = (function () {
     if (del) del.addEventListener('click', async () => {
       if (confirm('确定清除这一天的记录吗？')) { await Store.deleteDay(state.date); toast('已清除'); record(); }
     });
+
+    // —— 试纸照片：拍照/选图、并排对比、放大、删除 ——
+    const photoInput = c.querySelector('#lh-photo-input');
+    function bindStrip() {
+      c.querySelectorAll('#lh-photo-strip .lh-thumb').forEach((el) => {
+        el.addEventListener('click', () => {
+          const ds = el.dataset.date;
+          if (photoMap[ds]) openPhoto(ds);
+          else if (ds === date && photoInput) photoInput.click(); // 点今天的＋号去拍照
+        });
+      });
+    }
+    function refreshStrip() {
+      const strip = c.querySelector('#lh-photo-strip');
+      if (strip) { strip.innerHTML = photoStripHTML(photoMap, date); bindStrip(); }
+    }
+    function openPhoto(ds) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      const prevImg = photoMap[D.addDays(ds, -1)];
+      const human = D.human(ds).replace(/ 周.$/, '');
+      overlay.innerHTML = `
+        <div class="dp-card" style="max-width:340px">
+          <div class="np-title">${human} 试纸${prevImg ? '（和前一天并排比）' : ''}</div>
+          <div class="lh-compare">
+            ${prevImg ? `<figure class="lh-cmp"><img src="${prevImg}"><figcaption>前一天</figcaption></figure>` : ''}
+            <figure class="lh-cmp"><img src="${photoMap[ds]}"><figcaption>${ds === date ? '今天' : '这天'}</figcaption></figure>
+          </div>
+          <div class="np-actions">
+            <button class="np-cancel">关闭</button>
+            <button class="np-ok" id="ph-del" style="background:#c98b86">删除这张</button>
+          </div>
+        </div>`;
+      overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+      overlay.querySelector('.np-cancel').addEventListener('click', close);
+      overlay.querySelector('#ph-del').addEventListener('click', async () => {
+        await Store.deletePhoto(ds); delete photoMap[ds]; refreshStrip(); close(); toast('已删除照片');
+      });
+      overlay.addEventListener('click', close);
+    }
+    if (photoInput) photoInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      compressImage(file, 400, async (dataUrl) => {
+        await Store.putPhoto(date, dataUrl); photoMap[date] = dataUrl; refreshStrip(); toast('试纸照片已存 ✓');
+      });
+    });
+    // app 内置相机：直接拍、只进 app、不经过系统相机、不进相册
+    const camBtn = c.querySelector('#lh-cam-btn');
+    if (camBtn) camBtn.addEventListener('click', openCamera);
+    async function openCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('此环境不支持直接拍照，请用"从相册选"'); return;
+      }
+      let stream = null;
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="cam-card">
+          <video id="cam-video" autoplay muted playsinline></video>
+          <div class="cam-tip">把试纸放进框里、光线均匀；每天尽量同样的光，方便对比</div>
+          <div class="cam-actions">
+            <button id="cam-cancel" class="cam-btn">取消</button>
+            <button id="cam-shot" class="cam-btn shot">● 拍</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const video = overlay.querySelector('#cam-video');
+      const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); overlay.remove(); };
+      overlay.querySelector('#cam-cancel').addEventListener('click', stop);
+      overlay.querySelector('#cam-shot').addEventListener('click', () => {
+        const w = video.videoWidth, h = video.videoHeight;
+        if (!w) { toast('相机还没就绪，再等一下'); return; }
+        const scale = Math.min(1, 400 / w);
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+        cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
+        const dataUrl = cv.toDataURL('image/jpeg', 0.75);
+        Store.putPhoto(date, dataUrl).then(() => {
+          photoMap[date] = dataUrl; refreshStrip(); stop(); toast('试纸照片已存 ✓（未进相册）');
+        });
+      });
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream; video.play().catch(() => {});
+      } catch (err) {
+        stop(); toast('打不开相机（可能没授权），可改用"从相册选"');
+      }
+    }
+    bindStrip();
 
     updateSub();
   }
