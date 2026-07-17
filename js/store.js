@@ -11,7 +11,13 @@
  *     lh:          "none|negative|weak|strong|fading", // 排卵试纸
  *     mucus:       "none|dry|wet|slippery|sticky|creamy|eggwhite",  // 宫颈黏液（wet/slippery=按感觉记，slippery≈最易孕）
  *     intercourse: true | false,          // 同房
- *     note:        ""                     // 备注/心情
+ *     note:        "",                    // 备注/心情
+ *     scan: {                             // 复查监测数据；没记过这天就没有这个字段
+ *       lA, lB,                           // 左侧 长×宽 mm（null=没记）
+ *       rA, rB,                           // 右侧 长×宽 mm
+ *       thick,                            // 内层厚度 mm
+ *       stage,                            // 本次结论 ""|"doing"(进行中)|"done"(已完成)
+ *     }
  *   }
  *
  * 设置（周期长度等校准值）保存在 localStorage。

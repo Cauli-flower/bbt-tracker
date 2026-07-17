@@ -7,8 +7,20 @@
 window.Chart = (function () {
   const D = window.DateU;
   const TMIN = 35.5, TMAX = 37.5;
+  const SCAN = '#7d6f96';   // 灰紫：监测数据（与 app.css 的 --scan 一致）
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  // 监测数据：这天有没有记录 / 某侧的长
+  function hasScan(d) {
+    const s = d && d.scan; if (!s) return false;
+    return s.lA != null || s.lB != null || s.rA != null || s.rB != null || s.thick != null || !!s.stage;
+  }
+  // 左右分开标：两边常常各有一个、迟迟分不出大小，只标「最大的那个」等于没说
+  function sizeOf(d, side) {
+    const s = d && d.scan; if (!s) return null;
+    return s[side + 'A'] != null ? s[side + 'A'] : null;
+  }
 
   function render(cycle, a) {
     const days = cycle.days || [];
@@ -17,7 +29,7 @@ window.Chart = (function () {
     let maxCD = 30;
     days.forEach((d) => { maxCD = Math.max(maxCD, D.diffDays(start, d.date) + 1); });
 
-    const col = 26, padL = 34, padR = 12, padT = 16, padB = 104;
+    const col = 26, padL = 34, padR = 12, padT = 16, padB = 132; // padB 含底部 7 行标记
     const plotH = 230;
     const W = padL + padR + maxCD * col;
     const H = padT + plotH + padB;
@@ -98,6 +110,16 @@ window.Chart = (function () {
       svg += `<text x="${xx}" y="${padT - 4}" font-size="10" fill="#5f7174" text-anchor="middle">排卵 ↓</text>`;
     }
 
+    // —— 监测标为「已完成」的那天：紫色竖线（比体温推算更硬的证据，可以对着看差几天）——
+    for (let cd = 1; cd <= maxCD; cd++) {
+      const d = byCD[cd];
+      if (d && d.scan && d.scan.stage === 'done') {
+        const xx = x(cd);
+        svg += `<line x1="${xx}" y1="${padT}" x2="${xx}" y2="${padT + plotH}" stroke="${SCAN}" stroke-width="1.8" stroke-dasharray="4 3"/>`;
+        svg += `<text x="${xx}" y="${padT + plotH - 4}" font-size="9" fill="${SCAN}" text-anchor="middle" font-weight="600">已完成</text>`;
+      }
+    }
+
     // —— 体温折线 + 点 ——
     const pts = a.tempPoints || [];
     if (pts.length) {
@@ -112,9 +134,11 @@ window.Chart = (function () {
     // —— 底部标记行：每种标记各占一行，避免同一天叠在一起 ——
     const my = padT + plotH + 22;
     const laneH = 14;
-    const lane = { period: my, lh: my + laneH, mucus: my + 2 * laneH, sex: my + 3 * laneH, note: my + 4 * laneH };
+    const lane = { period: my, lh: my + laneH, mucus: my + 2 * laneH, sex: my + 3 * laneH, folL: my + 4 * laneH, folR: my + 5 * laneH, note: my + 6 * laneH };
     // 行首小标签，提示每行是什么
     svg += `<text x="${padL - 6}" y="${lane.period + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">经</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.folL + 3}" font-size="9" fill="${SCAN}" text-anchor="end">左</text>`;
+    svg += `<text x="${padL - 6}" y="${lane.folR + 3}" font-size="9" fill="${SCAN}" text-anchor="end">右</text>`;
     svg += `<text x="${padL - 6}" y="${lane.lh + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">纸</text>`;
     svg += `<text x="${padL - 6}" y="${lane.mucus + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">液</text>`;
     svg += `<text x="${padL - 6}" y="${lane.sex + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">房</text>`;
@@ -126,6 +150,13 @@ window.Chart = (function () {
       if (d.lh === 'strong') { svg += `<polygon points="${xx},${lane.lh - 5} ${xx + 5},${lane.lh + 4} ${xx - 5},${lane.lh + 4}" fill="#8ea1a6"/>`; }
       if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${lane.mucus - 5} ${xx + 5},${lane.mucus} ${xx},${lane.mucus + 5} ${xx - 5},${lane.mucus}" fill="#9aa890"/>`; }
       if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${lane.sex - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
+      // 「左/右」行：各标当侧的长 mm，看两边各自怎么变、哪边先跑出来
+      ['l', 'r'].forEach((side) => {
+        const ln = side === 'l' ? lane.folL : lane.folR;
+        const v = sizeOf(d, side);
+        if (v != null) { svg += `<text x="${xx}" y="${ln + 3}" font-size="9.5" fill="${SCAN}" text-anchor="middle" font-weight="700">${v}</text>`; }
+        else if (hasScan(d)) { svg += `<circle cx="${xx}" cy="${ln}" r="2" fill="${SCAN}" opacity="0.35"/>`; }
+      });
       if ((d.note || '').trim()) { svg += `<circle cx="${xx}" cy="${lane.note}" r="3.5" fill="#c79a5a"/>`; }
     }
 
@@ -153,6 +184,9 @@ window.Chart = (function () {
       <span>${I.tri(11, '#8ea1a6')} 试纸强阳(纸)</span>
       <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜(液)</span>
       <span>${I.heart(12, '#ad8a86')} 同房(房)</span>
+      <span><b style="color:${SCAN}">11</b> 监测尺寸 mm·左右各一行(左/右)</span>
+      <span style="color:${SCAN}">— — 监测标为「已完成」那天</span>
+      <span style="width:100%;color:#bbb">左右分开看：两边常各有一个、迟迟分不出大小，就看哪边先跑出来</span>
       <span><i class="dot" style="background:#c79a5a"></i>当天有备注(备)</span>
       <span style="width:100%;color:#bbb">👆点曲线上某一天，可看当天体温、测量时间和备注全文</span>
       <span style="width:100%;color:#bbb">基线＝你低温相的水平(不随高温漂移)；体温明显升到基线上方、且连续几天＝可能已排卵升温</span>

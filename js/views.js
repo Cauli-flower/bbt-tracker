@@ -17,11 +17,25 @@ window.Views = (function () {
   let _cur = null; // 记录页工作副本
 
   function blank(date) {
-    return { date, temp: null, tempTime: '', period: 'none', lh: 'none', mucus: 'none', intercourse: false, note: '' };
+    return { date, temp: null, tempTime: '', period: 'none', lh: 'none', mucus: 'none', intercourse: false, note: '', scan: blankScan() };
+  }
+  function blankScan() {
+    return { lA: null, lB: null, rA: null, rB: null, thick: null, stage: '' };
+  }
+  // 这天有没有填过监测数据（任一项即算）
+  function hasScan(r) {
+    const s = r && r.scan; if (!s) return false;
+    return s.lA != null || s.lB != null || s.rA != null || s.rB != null || s.thick != null || !!s.stage;
   }
   function isEmpty(r) {
     return r.temp == null && r.period === 'none' && r.lh === 'none' &&
-      r.mucus === 'none' && !r.intercourse && !(r.note || '').trim() && !r.tempTime;
+      r.mucus === 'none' && !r.intercourse && !(r.note || '').trim() && !r.tempTime && !hasScan(r);
+  }
+  // 尺寸文字：18×16 / 只有长时就 18
+  function sizeStr(a, b) {
+    if (a == null && b == null) return '';
+    if (a != null && b != null) return `${a}×${b}`;
+    return String(a != null ? a : b);
   }
 
   // 已保存内容清单（基于真正存入的记录，便于确认存没存上、存了哪些项）
@@ -62,6 +76,7 @@ window.Views = (function () {
     reader.readAsDataURL(file);
   }
   const MUCUS_L = { dry: '干', wet: '湿润', slippery: '滑溜', sticky: '黏稠', creamy: '乳白', eggwhite: '蛋清拉丝' };
+  const STAGE_L = { doing: '进行中', done: '已完成' };
   function daySummaryHTML(rec) {
     if (!rec || isEmpty(rec)) return '<div class="sum-empty">这一天还没有保存任何记录。填好后记得点下面「保存」。</div>';
     const chips = [];
@@ -70,6 +85,13 @@ window.Views = (function () {
     if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
     if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
     if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
+    if (hasScan(rec)) {
+      const s = rec.scan;
+      const sz = [sizeStr(s.lA, s.lB) && '左 ' + sizeStr(s.lA, s.lB), sizeStr(s.rA, s.rB) && '右 ' + sizeStr(s.rA, s.rB)].filter(Boolean).join(' · ');
+      if (sz) chips.push(`<span class="sum-chip">尺寸 <b>${sz} mm</b></span>`);
+      if (s.thick != null) chips.push(`<span class="sum-chip">内层 <b>${s.thick} mm</b></span>`);
+      if (s.stage) chips.push(`<span class="sum-chip">本次 <b>${STAGE_L[s.stage]}</b></span>`);
+    }
     if ((rec.note || '').trim()) chips.push('<span class="sum-chip">备注 <b>已填</b></span>');
     return `<div class="sum-list">${chips.join('')}</div>`;
   }
@@ -152,7 +174,9 @@ window.Views = (function () {
   }
 
   /* 自定义体温数字键盘（替代系统键盘，风格统一） */
-  function openNumpad(initial, onConfirm) {
+  // opts 缺省＝基础体温；记监测尺寸时传 { title, unit, min, max } 复用同一个键盘
+  function openNumpad(initial, onConfirm, opts) {
+    const o = Object.assign({ title: '基础体温', unit: '℃', min: 34, max: 43, maxDec: 2, maxDigits: 4 }, opts || {});
     let buf = (initial != null && !isNaN(initial)) ? String(initial) : '';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -163,8 +187,8 @@ window.Views = (function () {
     function draw() {
       overlay.innerHTML = `
         <div class="dp-card np-card">
-          <div class="np-title">基础体温</div>
-          <div class="np-display"><span class="np-val">${buf === '' ? '—' : buf}</span><span class="np-unit">℃</span></div>
+          <div class="np-title">${o.title}</div>
+          <div class="np-display"><span class="np-val">${buf === '' ? '—' : buf}</span><span class="np-unit">${o.unit}</span></div>
           <div class="np-grid">${keys.map((k) => `<button class="np-key${k === '⌫' ? ' np-back' : ''}" data-k="${k}">${k}</button>`).join('')}</div>
           <div class="np-actions">
             <button class="np-cancel">取消</button>
@@ -177,8 +201,8 @@ window.Views = (function () {
         if (k === '⌫') buf = buf.slice(0, -1);
         else if (k === '.') { if (buf === '') buf = '0.'; else if (!buf.includes('.')) buf += '.'; }
         else {
-          if (buf.includes('.') && buf.split('.')[1].length >= 2) return; // 最多 2 位小数
-          if (buf.replace('.', '').length >= 4) return;                    // 最多 4 位数字
+          if (buf.includes('.') && buf.split('.')[1].length >= o.maxDec) return;
+          if (buf.replace('.', '').length >= o.maxDigits) return;
           buf += k;
         }
         overlay.querySelector('.np-val').textContent = buf === '' ? '—' : buf;
@@ -186,7 +210,7 @@ window.Views = (function () {
       overlay.querySelector('.np-cancel').addEventListener('click', close);
       overlay.querySelector('.np-ok').addEventListener('click', () => {
         const v = buf === '' ? null : parseFloat(buf);
-        if (v != null && (isNaN(v) || v < 34 || v > 43)) { toast('请输入 34–43 之间的体温'); return; }
+        if (v != null && (isNaN(v) || v < o.min || v > o.max)) { toast(`请输入 ${o.min}–${o.max} 之间的数`); return; }
         close(); onConfirm(v);
       });
     }
@@ -256,6 +280,7 @@ window.Views = (function () {
     const date = state.date;
     const saved = await Store.getDay(date);
     _cur = Object.assign(blank(date), saved || {});
+    _cur.scan = Object.assign(blankScan(), _cur.scan || {}); // 老记录没有 scan / 字段不全时补齐
     if (LH_MIGRATE[_cur.lh]) _cur.lh = LH_MIGRATE[_cur.lh]; // 旧试纸值映射到新深浅阶梯
 
     const yDate = D.addDays(date, -1);
@@ -349,6 +374,40 @@ window.Views = (function () {
         </div>
       </div>
 
+      <details class="card scan-card" id="scan-box" ${hasScan(_cur) ? 'open' : ''}>
+        <summary class="scan-sum">
+          <span>监测数据 <span class="sub">没去复查的日子不用填</span></span>
+          <span class="caret">▾</span>
+        </summary>
+        <div class="field" style="margin-top:12px">
+          <label>尺寸 <span class="sub">mm · 长 × 宽，按单子上写的填</span></label>
+          ${['l', 'r'].map((side) => `
+            <div class="fol-row">
+              <span class="fol-side">${side === 'l' ? '左' : '右'}</span>
+              <button type="button" class="val-field sm" data-fol="${side}A"><span class="val-num${_cur.scan[side + 'A'] == null ? ' ph' : ''}">${_cur.scan[side + 'A'] != null ? _cur.scan[side + 'A'] : '长'}</span></button>
+              <span class="fol-x">×</span>
+              <button type="button" class="val-field sm" data-fol="${side}B"><span class="val-num${_cur.scan[side + 'B'] == null ? ' ph' : ''}">${_cur.scan[side + 'B'] != null ? _cur.scan[side + 'B'] : '宽'}</span></button>
+              <span class="val-unit">mm</span>
+            </div>`).join('')}
+          <div class="sub" style="margin-top:8px">哪侧单子上没写就留空。只报了一个数就填「长」。</div>
+        </div>
+        <div class="field">
+          <label>内层厚度 <span class="sub">mm · 单子上没写就留空</span></label>
+          <div class="fol-row">
+            <button type="button" class="val-field sm" data-fol="thick"><span class="val-num${_cur.scan.thick == null ? ' ph' : ''}">${_cur.scan.thick != null ? _cur.scan.thick : '厚度'}</span></button>
+            <span class="val-unit">mm</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>本次结论 <span class="sub">整个监测就是在等这句话</span></label>
+          ${seg('stage', 'stage', [
+            { v: '', label: '未记' }, { v: 'doing', label: '进行中' }, { v: 'done', label: '已完成' },
+          ], _cur.scan.stage || '')}
+          <div class="sub" style="margin-top:8px">复查时说这一轮<b>已经结束</b>了，就选「已完成」。曲线上会画一条竖线，可以和体温变化对着看。</div>
+        </div>
+        <div class="sub">填完记得点下面「保存」。复查日会标在曲线上，能和体温对着看。</div>
+      </details>
+
       <button class="btn" id="btn-save">保存</button>
       ${saved ? '<button class="btn ghost" id="btn-del">清除本日记录</button>' : ''}
     `;
@@ -376,8 +435,35 @@ window.Views = (function () {
     c.querySelector('#f-note').addEventListener('input', (e) => { _cur.note = e.target.value; markDirty(); });
     bindSeg(c, (name, val) => {
       if (name === 'intercourse') _cur.intercourse = (val === 'yes');
+      else if (name === 'stage') _cur.scan.stage = val;
       else _cur[name] = val;
       markDirty();
+    });
+
+    // 监测：长/宽、内层厚度都走同一个数字键盘
+    const SCAN_F = {
+      lA: { title: '左 · 长', min: 1, max: 50 }, lB: { title: '左 · 宽', min: 1, max: 50 },
+      rA: { title: '右 · 长', min: 1, max: 50 }, rB: { title: '右 · 宽', min: 1, max: 50 },
+      thick: { title: '内层厚度', min: 1, max: 30 },
+    };
+    c.querySelectorAll('[data-fol]').forEach((btn) => {
+      const k = btn.dataset.fol;
+      const ph = { lA: '长', lB: '宽', rA: '长', rB: '宽', thick: '厚度' }[k];
+      btn.addEventListener('click', () => {
+        openNumpad(_cur.scan[k], (v) => {
+          // 单子多半用 cm 写（1.8cm×1.6cm）。填进来一个 cm 大小的数就问一句，别默默存成 1.8mm。
+          if (v != null && v < 5) {
+            if (confirm(`填的是 ${v} mm 吗？\n\n单子上如果写的是 ${v} cm，要换成 ${(v * 10).toFixed(0)} mm。\n\n点「确定」＝按 cm 换算成 ${(v * 10).toFixed(0)} mm\n点「取消」＝就按 ${v} mm 存`)) {
+              v = Math.round(v * 10 * 10) / 10;
+            }
+          }
+          _cur.scan[k] = v;
+          const numEl = btn.querySelector('.val-num');
+          numEl.textContent = v != null ? v : ph;
+          numEl.classList.toggle('ph', v == null);
+          markDirty();
+        }, Object.assign({ unit: 'mm', maxDec: 1, maxDigits: 3 }, SCAN_F[k]));
+      });
     });
 
     c.querySelector('#date-pick-btn').addEventListener('click', () => {
@@ -505,7 +591,10 @@ window.Views = (function () {
   async function saveCur(silent) {
     if (!_cur) return;
     if (isEmpty(_cur)) { await Store.deleteDay(_cur.date); return; }
-    await Store.putDay(Object.assign({}, _cur));
+    const rec = Object.assign({}, _cur);
+    if (hasScan(rec)) rec.scan = Object.assign({}, rec.scan);
+    else delete rec.scan;   // 没填监测就不写这个字段，免得每天都存一堆空值
+    await Store.putDay(rec);
   }
 
   async function updateSub() {
@@ -650,6 +739,13 @@ window.Views = (function () {
       if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
       if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
       if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
+      if (hasScan(rec)) {
+        const s = rec.scan;
+        if (sizeStr(s.lA, s.lB)) chips.push(`<span class="sum-chip">左 <b>${sizeStr(s.lA, s.lB)} mm</b></span>`);
+        if (sizeStr(s.rA, s.rB)) chips.push(`<span class="sum-chip">右 <b>${sizeStr(s.rA, s.rB)} mm</b></span>`);
+        if (s.thick != null) chips.push(`<span class="sum-chip">内层 <b>${s.thick} mm</b></span>`);
+        if (s.stage) chips.push(`<span class="sum-chip">本次 <b>${STAGE_L[s.stage]}</b></span>`);
+      }
     }
     const hasNote = rec && (rec.note || '').trim();
     overlay.innerHTML = `

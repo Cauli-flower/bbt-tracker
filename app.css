@@ -10,6 +10,7 @@
   --ink: #4a4543;         /* 暖深灰 */
   --ink-soft: #918884;
   --line: #e6ded9;
+  --scan: #7d6f96;        /* 灰紫：监测数据（曲线「左/右」行、「已完成」竖线）*/
   --card: #fbf9f7;
   --shadow: 0 2px 12px rgba(120, 105, 100, 0.10);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -172,6 +173,31 @@ body {
 }
 .time-field svg { display: block; stroke: var(--ink-soft); }
 
+/* ---------- 监测数据折叠卡 ---------- */
+.scan-card { padding: 14px 16px; }
+.scan-card > summary { list-style: none; cursor: pointer; }
+.scan-card > summary::-webkit-details-marker { display: none; }
+.scan-sum {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 15px; font-weight: 600;
+}
+.scan-sum .sub { font-weight: 400; }
+.scan-sum .caret { color: var(--ink-soft); font-size: 12px; transition: transform .15s; }
+.scan-card[open] .scan-sum .caret { transform: rotate(180deg); }
+.fol-row { display: flex; align-items: center; gap: 8px; }
+.fol-row + .fol-row { margin-top: 8px; }
+.fol-side {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--pink-soft); color: var(--pink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.fol-x { color: var(--ink-soft); font-size: 14px; }
+.fol-row .val-unit { flex: none; font-size: 14px; color: var(--ink-soft); }
+.val-field.sm { padding: 9px 8px; border-radius: 12px; }
+.val-field.sm .val-num { font-size: 19px; }
+.val-field.sm .val-num.ph { font-size: 14px; font-weight: 400; color: var(--ink-soft); }
+
 /* 本日已保存清单 */
 .sum-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .sum-chip {
@@ -235,6 +261,7 @@ body {
 .seg.lh button.on { background: var(--blue); }
 .seg.mucus button.on { background: var(--green); }
 .seg.bool button.on { background: var(--pink); }
+.seg.stage button.on { background: var(--scan); }
 
 textarea {
   width: 100%; border: 1.5px solid var(--line); border-radius: 12px;
