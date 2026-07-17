@@ -383,3 +383,30 @@ textarea {
   font-size: 14px; z-index: 50; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+/* ---------- 监测趋势表 ---------- */
+.scan-trend .tr-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tr-tab { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tr-tab th {
+  font-size: 11px; font-weight: 500; color: var(--ink-soft);
+  text-align: left; padding: 0 8px 6px 0; white-space: nowrap;
+}
+.tr-tab td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.tr-tab tbody tr:first-child td { border-top: none; }
+.tr-tab b { color: var(--scan); font-size: 15px; }
+.tr-date { white-space: nowrap; color: var(--ink); font-size: 13px; }
+.tr-cd, .tr-gap { display: block; font-size: 10.5px; color: var(--ink-soft); }
+.tr-gap { color: #b9afac; }
+.tr-w { font-size: 11px; color: var(--ink-soft); margin-left: 1px; }
+.tr-d { font-size: 11px; color: #7a8a6e; margin-left: 4px; font-weight: 600; }
+.tr-none { color: #d5cdc9; }
+.tr-stage {
+  display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: var(--pink-bg); color: var(--ink-soft); white-space: nowrap;
+}
+.tr-stage.done { background: var(--scan); color: #fff; }
+.tr-sum {
+  margin-top: 10px; padding: 9px 11px; background: var(--pink-bg);
+  border-radius: 10px; font-size: 13px; line-height: 1.7; color: var(--ink);
+}
+.tr-sum b { color: var(--scan); }

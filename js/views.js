@@ -696,6 +696,8 @@ window.Views = (function () {
         ${Chart.legendHTML()}
       </div>
 
+      ${scanTrendHTML(cycle)}
+
       <div class="stat-grid">
         <div class="stat"><div class="num">${cdays || '—'}</div><div class="lbl">本周期天数</div></div>
         <div class="stat"><div class="num" style="font-size:15px">${ovuTxt}</div><div class="lbl">排卵日(体温确认)</div></div>
@@ -720,6 +722,75 @@ window.Views = (function () {
       const rec = (cycle.days || []).find((d) => d.date === ds);
       showDayPopup(cycle, ds, rec);
     }));
+  }
+
+  /* 监测趋势：把本周期每次复查按日期排开，算出「隔了几天、长了多少、每天多少」。
+     单看两个孤立数字看不出快慢，看「每天长多少」才知道有没有在动。 */
+  function trendRate(visits, side) {
+    const seen = visits.filter((v) => v.scan[side + 'A'] != null);
+    if (seen.length < 2) return null;
+    const first = seen[0], last = seen[seen.length - 1];
+    const gap = D.diffDays(first.date, last.date);
+    if (gap <= 0) return null;
+    const delta = last.scan[side + 'A'] - first.scan[side + 'A'];
+    return { from: first.scan[side + 'A'], to: last.scan[side + 'A'], gap, delta, perDay: delta / gap };
+  }
+  function fmtDelta(n) {
+    if (n == null) return '';
+    const r = Math.round(n * 10) / 10;
+    return (r > 0 ? '+' : '') + r;
+  }
+  function scanTrendHTML(cycle) {
+    const visits = (cycle.days || []).filter(hasScan).sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (!visits.length) return '';
+
+    const rows = visits.map((v, i) => {
+      const cd = D.diffDays(cycle.start, v.date) + 1;
+      const prev = visits[i - 1];
+      const gap = prev ? D.diffDays(prev.date, v.date) : null;
+      const cell = (side) => {
+        const val = v.scan[side + 'A'];
+        if (val == null) return '<span class="tr-none">—</span>';
+        // 跟上一次「记过这一侧」的复查比，中间漏记的不算断档
+        let d = null;
+        for (let k = i - 1; k >= 0; k--) {
+          if (visits[k].scan[side + 'A'] != null) { d = val - visits[k].scan[side + 'A']; break; }
+        }
+        const w = v.scan[side + 'B'] != null ? `<span class="tr-w">×${v.scan[side + 'B']}</span>` : '';
+        return `<b>${val}</b>${w}${d != null && d !== 0 ? `<span class="tr-d">${fmtDelta(d)}</span>` : ''}`;
+      };
+      return `<tr>
+        <td class="tr-date">${v.date.slice(5).replace('-', '/')}<span class="tr-cd">第${cd}天</span>${gap != null ? `<span class="tr-gap">隔${gap}天</span>` : ''}</td>
+        <td>${cell('l')}</td>
+        <td>${cell('r')}</td>
+        <td>${v.scan.thick != null ? v.scan.thick : '<span class="tr-none">—</span>'}</td>
+        <td>${v.scan.stage ? `<span class="tr-stage${v.scan.stage === 'done' ? ' done' : ''}">${STAGE_L[v.scan.stage]}</span>` : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const L = trendRate(visits, 'l'), R = trendRate(visits, 'r');
+    let summary;
+    if (!L && !R) {
+      summary = visits.length < 2
+        ? '再记一次复查，这里就会自动算出「隔了几天、每天长多少」。'
+        : '同一侧至少记两次「长」，才能算出长得快慢。';
+    } else {
+      const one = (r, name) => r ? `<b>${name} ${r.from} → ${r.to}</b>（${r.gap} 天 ${fmtDelta(r.delta)}，约 <b>${fmtDelta(r.perDay)} mm/天</b>）` : '';
+      summary = [one(L, '左'), one(R, '右')].filter(Boolean).join('　·　');
+    }
+
+    return `
+      <div class="card scan-trend">
+        <h2>监测趋势 <span class="hint">本周期共 ${visits.length} 次</span></h2>
+        <div class="tr-wrap">
+          <table class="tr-tab">
+            <thead><tr><th>日期</th><th>左</th><th>右</th><th>内层</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="tr-sum">${summary}</div>
+        <div class="sub" style="margin-top:8px">变化量是跟<b>上一次记过这侧</b>的复查比。看「每天多少」比看单个数字有用——两边都停着不动，和一边开始往上走，是完全不同的两回事。</div>
+      </div>`;
   }
 
   // 点曲线某天弹出的小卡：体温 + 测量时间 + 各信号 + 备注全文，可跳去编辑
