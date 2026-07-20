@@ -22,6 +22,8 @@ window.Chart = (function () {
     return s[side + 'A'] != null ? s[side + 'A'] : null;
   }
 
+  const LH_RANK = { negative: 0, faint: 1, medium: 2, near: 3, strong: 4 };
+
   function render(cycle, a) {
     const days = cycle.days || [];
     const start = cycle.start;
@@ -143,11 +145,29 @@ window.Chart = (function () {
     svg += `<text x="${padL - 6}" y="${lane.mucus + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">液</text>`;
     svg += `<text x="${padL - 6}" y="${lane.sex + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">房</text>`;
     svg += `<text x="${padL - 6}" y="${lane.note + 3}" font-size="9" fill="#c8c0bd" text-anchor="end">备</text>`;
+    // 试纸深浅阶梯线：把每天档位（阴→强阳）连起来，看深浅怎么爬、哪天跳上去
+    const lhBand = 5; // 档位在这一行内上下摆动的幅度（px）
+    const lhY = (rank) => lane.lh + lhBand - (rank / 4) * (lhBand * 2);
+    const lhPts = [];
+    for (let cd = 1; cd <= maxCD; cd++) { const d = byCD[cd]; if (d && d.lh && LH_RANK[d.lh] != null) lhPts.push({ cd, rank: LH_RANK[d.lh], lh: d.lh }); }
+    if (lhPts.length >= 2) {
+      let lp = '';
+      lhPts.forEach((p, i) => { lp += (i ? ' L' : 'M') + x(p.cd) + ' ' + lhY(p.rank); });
+      svg += `<path d="${lp}" fill="none" stroke="#8ea1a6" stroke-width="1.3" opacity="0.55" stroke-linejoin="round"/>`;
+    }
     for (let cd = 1; cd <= maxCD; cd++) {
       const d = byCD[cd]; if (!d) continue;
       const xx = x(cd);
-      if (window.Cycle.isPeriod(d)) { svg += `<circle cx="${xx}" cy="${lane.period}" r="4" fill="#ad8a86"/>`; }
-      if (d.lh === 'strong') { svg += `<polygon points="${xx},${lane.lh - 5} ${xx + 5},${lane.lh + 4} ${xx - 5},${lane.lh + 4}" fill="#8ea1a6"/>`; }
+      if (window.Cycle.isPeriod(d)) {
+        // 无排卵出血用空心圈，和真月经（实心）区分
+        if (d.breakthrough) svg += `<circle cx="${xx}" cy="${lane.period}" r="4" fill="#fff" stroke="#ad8a86" stroke-width="1.6"/>`;
+        else svg += `<circle cx="${xx}" cy="${lane.period}" r="4" fill="#ad8a86"/>`;
+      }
+      if (d.lh && LH_RANK[d.lh] != null) {
+        const yy = lhY(LH_RANK[d.lh]);
+        if (d.lh === 'strong') svg += `<polygon points="${xx},${yy - 4} ${xx + 4},${yy + 3} ${xx - 4},${yy + 3}" fill="#8ea1a6"/>`;
+        else svg += `<circle cx="${xx}" cy="${yy}" r="2.4" fill="#8ea1a6" opacity="${0.35 + LH_RANK[d.lh] * 0.15}"/>`;
+      }
       if (d.mucus === 'eggwhite' || d.mucus === 'slippery') { svg += `<polygon points="${xx},${lane.mucus - 5} ${xx + 5},${lane.mucus} ${xx},${lane.mucus + 5} ${xx - 5},${lane.mucus}" fill="#9aa890"/>`; }
       if (d.intercourse) { svg += `<g transform="translate(${xx - 6} ${lane.sex - 6}) scale(0.5)" fill="#ad8a86"><path d="${window.Icons.P.heartPath}"/></g>`; }
       // 「左/右」行：各标当侧的长 mm，看两边各自怎么变、哪边先跑出来
@@ -158,6 +178,15 @@ window.Chart = (function () {
         else if (hasScan(d)) { svg += `<circle cx="${xx}" cy="${ln}" r="2" fill="${SCAN}" opacity="0.35"/>`; }
       });
       if ((d.note || '').trim()) { svg += `<circle cx="${xx}" cy="${lane.note}" r="3.5" fill="#c79a5a"/>`; }
+    }
+
+    // 试纸「跃升」那天：小箭头 + 标注，提示深浅明显往上跳
+    if (a.lhSurge) {
+      const scd = D.diffDays(start, a.lhSurge.date) + 1;
+      if (scd >= 1 && scd <= maxCD) {
+        const xx = x(scd);
+        svg += `<text x="${xx}" y="${lane.lh - 6}" font-size="10" fill="#5f7174" text-anchor="middle" font-weight="700">↑跃升</text>`;
+      }
     }
 
     // —— 透明点击热区：点某天那一列 → 弹出当天体温/备注（在 views.js 绑定）——
@@ -181,7 +210,9 @@ window.Chart = (function () {
       <span style="color:#ad8a86">— — 覆盖线</span>
       <span style="color:#a89f9c">— — 基线(低温相)</span>
       <span><i class="dot" style="background:#ad8a86"></i>经期(经)</span>
+      <span><i class="dot" style="background:#fff;border:1.6px solid #ad8a86;box-sizing:border-box"></i>空心＝无排卵出血</span>
       <span>${I.tri(11, '#8ea1a6')} 试纸强阳(纸)</span>
+      <span style="width:100%;color:#bbb">试纸行连成阶梯线：点越高＝越接近强阳；标「↑跃升」＝深浅明显往上跳，可能快排卵</span>
       <span>${I.dia(11, '#9aa890')} 蛋清拉丝 / 滑溜(液)</span>
       <span>${I.heart(12, '#ad8a86')} 同房(房)</span>
       <span><b style="color:${SCAN}">11</b> 监测尺寸 mm·左右各一行(左/右)</span>

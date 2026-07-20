@@ -35,6 +35,27 @@ window.Cycle = (function () {
 
   function isPeriod(rec) { return rec && FLOW.indexOf(rec.period) >= 0; }
 
+  // 试纸深浅档位（同一根试纸上，测试线 T 相对对照线 C 有多深）
+  const LH_RANK = { negative: 0, faint: 1, medium: 2, near: 3, strong: 4 };
+
+  /* 试纸「跃升」：找最近一次明显往上跳的记录（比上一次测量高 ≥2 档、且到「接近/强阳」）。
+   * 抓的是深浅的跳变，而不是「有没有两条杠」——对基础 LH 不高的人更准。
+   * 返回 { date, from, to, fresh }（from/to 为档位代码）；没有则 null。fresh=跃升就发生在最后一次测量。 */
+  function lhSurge(cycleDays) {
+    const seq = (cycleDays || [])
+      .filter((d) => d.lh && LH_RANK[d.lh] != null)
+      .map((d) => ({ date: d.date, r: LH_RANK[d.lh], lh: d.lh }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (seq.length < 2) return null;
+    for (let i = seq.length - 1; i >= 1; i--) {
+      const cur = seq[i], prev = seq[i - 1];
+      if (cur.r >= 3 && cur.r - prev.r >= 2) {
+        return { date: cur.date, from: prev.lh, to: cur.lh, fresh: i === seq.length - 1 };
+      }
+    }
+    return null;
+  }
+
   /* 把记录按经期开始日切分成周期。
    * 经期开始日 = 该日有经量，且前一天不是经期。
    * 返回数组：{ index, start, end, isOpen, days:[按日期升序的本周期记录] }
@@ -78,6 +99,9 @@ window.Cycle = (function () {
     cycles.forEach((c) => {
       c.days = days.filter((d) => d.date >= c.start && d.date <= c.end);
       c.nextStart = c.isOpen ? null : D.addDays(c.end, 1);
+      // 起点这天是不是「无排卵出血」；下次月经那天是不是（说明本周期被一次突破性出血提前截断）
+      c.startBreakthrough = !c.noPeriodStart && !!(byDate[c.start] && byDate[c.start].breakthrough);
+      c.endBreakthrough = !!(c.nextStart && byDate[c.nextStart] && byDate[c.nextStart].breakthrough);
     });
     return cycles;
   }
@@ -105,6 +129,7 @@ window.Cycle = (function () {
       text: '',
       lhHint: null,
       lhCaveat: null,
+      lhSurge: lhSurge(cycle.days),
       tempPoints: pts,
     };
 
@@ -211,6 +236,14 @@ window.Cycle = (function () {
       }
     }
 
+    // 突破性出血起点的片段：不作完整周期判断（也不进平均），避免被误读成「无排卵周期」
+    if (cycle.startBreakthrough && !result.ovulationConfirmed) {
+      result.classification = 'unknown';
+      result.state = 'pending';
+      result.title = '这段从一次「无排卵出血」起算';
+      result.text = '通常是上一波卵泡没长成熟就退掉后的出血，只作重新计天用，不当成完整周期、也不计入平均周期。继续每天记录，等新一波长起来。';
+    }
+
     return result;
   }
 
@@ -218,8 +251,9 @@ window.Cycle = (function () {
   function cycleStats(cycles, settings) {
     settings = settings || { avgCycle: 28, avgLuteal: 14 };
     const completed = cycles.filter((c) => !c.isOpen && c.nextStart);
-    // 周期长度统计只用"起点确定"的完整周期；起点未记录那段长度不准，排除
-    const realCompleted = completed.filter((c) => !c.noPeriodStart);
+    // 周期长度统计只用"起点确定"的完整周期；起点未记录那段长度不准，排除。
+    // 无排卵出血起点、或被无排卵出血提前截断的那段，长度都不是真实周期，也排除。
+    const realCompleted = completed.filter((c) => !c.noPeriodStart && !c.startBreakthrough && !c.endBreakthrough);
     const lengths = realCompleted.map((c) => D.diffDays(c.start, c.nextStart));
     const lutealLens = [];
     completed.forEach((c) => { const a = analyzeCycle(c); if (a.lutealLength && a.ovulationConfirmed) lutealLens.push(a.lutealLength); });
@@ -263,12 +297,14 @@ window.Cycle = (function () {
     // 最近若干个“已结束”周期里，连续无排卵的条数
     let recentAnovStreak = 0; let counting = true;
     for (let i = completed.length - 1; i >= 0; i--) {
+      // 突破性出血起点的片段不是完整周期，跳过（否则会虚增「连续无排卵」）
+      if (completed[i].startBreakthrough) continue;
       const a = analyzeCycle(completed[i]);
       if (a.classification === 'ovulatory') { ovulatory++; if (a.shortLuteal) shortLuteal++; counting = false; }
       else if (a.classification === 'anovulatory') { anovulatory++; if (counting) recentAnovStreak++; }
       else { unknown++; counting = false; }
     }
-    const total = completed.length;
+    const total = ovulatory + anovulatory + unknown;
     // 温和的就诊提示（不下诊断）
     const suggestSeeDoctor = recentAnovStreak >= 2 ||
       (cycles.find((c) => c.isOpen && !c.noPeriodStart) &&

@@ -157,6 +157,11 @@ body {
 .field > label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
 .field .sub { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
 
+/* 「无排卵出血」勾选行 */
+.brk-toggle { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 400; cursor: pointer; }
+.brk-toggle input { margin-top: 2px; width: 16px; height: 16px; flex: none; accent-color: var(--pink); }
+.brk-toggle .sub { display: block; margin-top: 2px; }
+
 /* 体温 / 时间 自定义触发按钮 */
 .val-row { display: flex; align-items: stretch; gap: 12px; }
 .val-field {
@@ -405,6 +410,9 @@ textarea {
   background: var(--pink-bg); color: var(--ink-soft); white-space: nowrap;
 }
 .tr-stage.done { background: var(--scan); color: #fff; }
+.tr-mat { display: inline-block; font-size: 10px; margin-left: 4px; padding: 1px 5px; border-radius: 999px; white-space: nowrap; vertical-align: middle; }
+.tr-mat.near { background: #dde8e6; color: #5f8a82; }
+.tr-mat.early { background: #efe9ea; color: #b0a6a3; }
 .tr-sum {
   margin-top: 10px; padding: 9px 11px; background: var(--pink-bg);
   border-radius: 10px; font-size: 13px; line-height: 1.7; color: var(--ink);

@@ -17,7 +17,7 @@ window.Views = (function () {
   let _cur = null; // 记录页工作副本
 
   function blank(date) {
-    return { date, temp: null, tempTime: '', period: 'none', lh: 'none', mucus: 'none', intercourse: false, note: '', scan: blankScan() };
+    return { date, temp: null, tempTime: '', period: 'none', breakthrough: false, lh: 'none', mucus: 'none', intercourse: false, note: '', scan: blankScan() };
   }
   function blankScan() {
     return { lA: null, lB: null, rA: null, rB: null, thick: null, stage: '' };
@@ -75,13 +75,31 @@ window.Views = (function () {
     };
     reader.readAsDataURL(file);
   }
+  // 试纸深浅示意图：五根迷你试纸，对照线 C 恒定、测试线 T 由浅到深，追上 C 就是强阳。
+  // 给「阴/浅/中/接近/强阳」配图，一眼知道是拿 T 跟 C 比、不是跟昨天比。
+  function lhLadderSVG() {
+    const labels = ['阴', '浅', '中', '接近', '强阳'];
+    const tOp = [0.12, 0.34, 0.56, 0.8, 1];
+    const cw = 60;
+    let cells = '';
+    for (let i = 0; i < 5; i++) {
+      const cx = i * cw + cw / 2;
+      cells += `<rect x="${i * cw + 11}" y="6" width="${cw - 22}" height="34" rx="5" fill="#faf7f8" stroke="#e7dfe1"/>`;
+      cells += `<line x1="${cx - 7}" y1="11" x2="${cx - 7}" y2="35" stroke="#7a7a7a" stroke-width="3" stroke-linecap="round" opacity="0.85"/>`;
+      cells += `<line x1="${cx + 7}" y1="11" x2="${cx + 7}" y2="35" stroke="#7a7a7a" stroke-width="3" stroke-linecap="round" opacity="${tOp[i]}"/>`;
+      cells += `<text x="${cx - 7}" y="47" font-size="7" fill="#b7afb1" text-anchor="middle">C</text>`;
+      cells += `<text x="${cx + 7}" y="47" font-size="7" fill="#b7afb1" text-anchor="middle">T</text>`;
+      cells += `<text x="${cx}" y="61" font-size="10" fill="#8a7f83" text-anchor="middle" font-weight="600">${labels[i]}</text>`;
+    }
+    return `<svg viewBox="0 0 300 66" width="100%" style="max-width:320px;display:block;margin:8px auto 0" xmlns="http://www.w3.org/2000/svg">${cells}</svg>`;
+  }
   const MUCUS_L = { dry: '干', wet: '湿润', slippery: '滑溜', sticky: '黏稠', creamy: '乳白', eggwhite: '蛋清拉丝' };
   const STAGE_L = { doing: '进行中', done: '已完成' };
   function daySummaryHTML(rec) {
     if (!rec || isEmpty(rec)) return '<div class="sum-empty">这一天还没有保存任何记录。填好后记得点下面「保存」。</div>';
     const chips = [];
     if (rec.temp != null) chips.push(`<span class="sum-chip">体温 <b>${rec.temp.toFixed(2)}℃</b>${rec.tempTime ? ' · ' + rec.tempTime : ''}</span>`);
-    if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b></span>`);
+    if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : ''}</span>`);
     if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
     if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
     if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
@@ -334,6 +352,10 @@ window.Views = (function () {
             { v: 'none', label: '无' }, { v: 'light', label: '少' },
             { v: 'medium', label: '中' }, { v: 'heavy', label: '多' },
           ], _cur.period)}
+          <label class="brk-toggle" id="brk-row" style="${_cur.period === 'none' ? 'display:none' : ''}">
+            <input type="checkbox" id="f-breakthrough" ${_cur.breakthrough ? 'checked' : ''}>
+            <span>这次是无排卵出血（突破性）<span class="sub">照样计天，但不计入平均周期；曲线上用空心圈标</span></span>
+          </label>
           <div class="sub" style="margin-top:8px">误记成月经了？把经量改回“无”即可，周期会自动重算。</div>
         </div>
         <div class="field">
@@ -343,6 +365,8 @@ window.Views = (function () {
             { v: 'faint', label: '浅' }, { v: 'medium', label: '中' },
             { v: 'near', label: '接近' }, { v: 'strong', label: '强阳' },
           ], _cur.lh)}
+          ${lhLadderSVG()}
+          <div class="sub" style="margin-top:2px">看<b>同一根试纸</b>：测试线 T 跟对照线 C 比有多深，<b>T≥C 就是强阳</b>。跟昨天比深浅是下面照片那排的事。</div>
           <div class="lh-cap-row">
             <button type="button" id="lh-cam-btn" class="lh-cap-btn">📷 拍试纸（不进相册）</button>
             <label class="lh-cap-btn ghost">从相册选<input type="file" id="lh-photo-input" accept="image/*" hidden></label>
@@ -437,8 +461,16 @@ window.Views = (function () {
       if (name === 'intercourse') _cur.intercourse = (val === 'yes');
       else if (name === 'stage') _cur.scan.stage = val;
       else _cur[name] = val;
+      // 经量改动时，联动「无排卵出血」开关的显隐；改回「无」则清掉该标记
+      if (name === 'period') {
+        const brkRow = c.querySelector('#brk-row');
+        if (brkRow) brkRow.style.display = val === 'none' ? 'none' : '';
+        if (val === 'none') { _cur.breakthrough = false; const cb = c.querySelector('#f-breakthrough'); if (cb) cb.checked = false; }
+      }
       markDirty();
     });
+    const brkCb = c.querySelector('#f-breakthrough');
+    if (brkCb) brkCb.addEventListener('change', (e) => { _cur.breakthrough = e.target.checked; markDirty(); });
 
     // 监测：长/宽、内层厚度都走同一个数字键盘
     const SCAN_F = {
@@ -592,6 +624,7 @@ window.Views = (function () {
     if (!_cur) return;
     if (isEmpty(_cur)) { await Store.deleteDay(_cur.date); return; }
     const rec = Object.assign({}, _cur);
+    if (rec.period === 'none') rec.breakthrough = false; // 没出血就不留「无排卵出血」标记
     if (hasScan(rec)) rec.scan = Object.assign({}, rec.scan);
     else delete rec.scan;   // 没填监测就不写这个字段，免得每天都存一堆空值
     await Store.putDay(rec);
@@ -687,6 +720,7 @@ window.Views = (function () {
         <div class="vtitle">${a.title} ${confirmBadge}</div>
         <div>${a.text}</div>
         ${a.lhHint ? `<div style="margin-top:8px">🔎 ${a.lhHint}</div>` : ''}
+        ${a.lhSurge ? `<div style="margin-top:8px">📈 试纸在 ${D.human(a.lhSurge.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[a.lhSurge.from]}→${LH_L[a.lhSurge.to]}），LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${a.lhSurge.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>` : ''}
         ${a.lhCaveat ? `<div style="margin-top:8px;color:#877049">⚠️ ${a.lhCaveat}</div>` : ''}
         ${a.shortLuteal ? `<div style="margin-top:8px;color:#877049">⚠️ 黄体期偏短（<10 天），若多个周期如此可咨询医生。</div>` : ''}
       </div>
@@ -740,6 +774,13 @@ window.Views = (function () {
     const r = Math.round(n * 10) / 10;
     return (r > 0 ? '+' : '') + r;
   }
+  // 卵泡成熟度标尺（尺寸按 mm）：成熟卵泡一般 18–25mm。纯参考，不下判断。
+  function maturityTag(mm) {
+    if (mm == null) return '';
+    if (mm >= 18) return '<span class="tr-mat near">接近成熟</span>';
+    if (mm < 14) return '<span class="tr-mat early">还早</span>';
+    return '';
+  }
   function scanTrendHTML(cycle) {
     const visits = (cycle.days || []).filter(hasScan).sort((a, b) => (a.date < b.date ? -1 : 1));
     if (!visits.length) return '';
@@ -757,7 +798,7 @@ window.Views = (function () {
           if (visits[k].scan[side + 'A'] != null) { d = val - visits[k].scan[side + 'A']; break; }
         }
         const w = v.scan[side + 'B'] != null ? `<span class="tr-w">×${v.scan[side + 'B']}</span>` : '';
-        return `<b>${val}</b>${w}${d != null && d !== 0 ? `<span class="tr-d">${fmtDelta(d)}</span>` : ''}`;
+        return `<b>${val}</b>${w}${d != null && d !== 0 ? `<span class="tr-d">${fmtDelta(d)}</span>` : ''}${maturityTag(val)}`;
       };
       return `<tr>
         <td class="tr-date">${v.date.slice(5).replace('-', '/')}<span class="tr-cd">第${cd}天</span>${gap != null ? `<span class="tr-gap">隔${gap}天</span>` : ''}</td>
@@ -790,6 +831,7 @@ window.Views = (function () {
         </div>
         <div class="tr-sum">${summary}</div>
         <div class="sub" style="margin-top:8px">变化量是跟<b>上一次记过这侧</b>的复查比。看「每天多少」比看单个数字有用——两边都停着不动，和一边开始往上走，是完全不同的两回事。</div>
+        <div class="sub" style="margin-top:4px">尺寸标尺（参考）：成熟一般在 <b>18–25mm</b>，到 18 标「接近成熟」；<b>不足 14mm</b> 还早。仅供对照，具体以复查为准。</div>
       </div>`;
   }
 
