@@ -137,6 +137,91 @@ window.Views = (function () {
   // 计划结束日：开始日 + 天数 - 1
   function medPlanEnd(m) { return m.days ? D.addDays(m.start, m.days - 1) : ''; }
 
+  // 一天吃几次 → 每次叫什么
+  const DOSE_L = { 1: ['今天'], 2: ['早', '晚'], 3: ['早', '中', '晚'], 4: ['①', '②', '③', '④'] };
+  function dosePer(m) { return DOSE_L[m.perDay] ? m.perDay : 2; }   // 老疗程没这字段，按一天两次
+  function doseLabels(m) { return DOSE_L[dosePer(m)]; }
+  // 某天已经勾了哪几次，返回下标数组 [0,1]
+  function takenOn(m, date) {
+    const t = m.taken && m.taken[date];
+    return Array.isArray(t) ? t : [];
+  }
+  // 勾 / 取消某天的第 i 次；返回勾完之后这天吃了几次
+  function setDose(id, date, i, on) {
+    const list = Store.getMeds();
+    const m = list.find((x) => x.id === id);
+    if (!m) return 0;
+    m.taken = m.taken || {};
+    const set = new Set(takenOn(m, date));
+    if (on) set.add(i); else set.delete(i);
+    const arr = Array.from(set).sort((a, b) => a - b);
+    if (arr.length) m.taken[date] = arr; else delete m.taken[date];
+    Store.saveMeds(list);
+    return arr.length;
+  }
+  // 一键补记：这天全吃了
+  function fillDoses(id, date) {
+    const list = Store.getMeds();
+    const m = list.find((x) => x.id === id);
+    if (!m) return;
+    m.taken = m.taken || {};
+    m.taken[date] = Array.from({ length: dosePer(m) }, (_, i) => i);
+    Store.saveMeds(list);
+  }
+  /* 漏没漏的统计：只算「已经过完」的日子。
+     今天的晚饭还没到点就说人家漏了，纯属添堵，所以今天不计入。 */
+  function doseStats(m) {
+    const today = D.todayStr();
+    const last = m.end && m.end < today ? m.end : D.addDays(today, -1);   // 统计到昨天/结束日
+    if (last < m.start) return '';
+    const per = dosePer(m);
+    const days = D.diffDays(m.start, last) + 1;
+    let taken = 0;
+    for (let i = 0; i < days; i++) taken += takenOn(m, D.addDays(m.start, i)).length;
+    const missed = days * per - taken;
+    if (taken === 0) return '';                       // 一次都没勾过，先别急着说漏
+    return missed <= 0
+      ? `${m.end ? '这个疗程' : `前 ${days} 天`}一次没漏 ✓`
+      : `${m.end ? '这个疗程' : `前 ${days} 天`}漏了 ${missed} 次`;
+  }
+  // 最近几天的勾选情况，一眼看出漏在哪天；点一下跳到那天补勾
+  function doseStripHTML(m, date) {
+    const per = dosePer(m);
+    const cells = [];
+    for (let i = 6; i >= 0; i--) {
+      const ds = D.addDays(date, -i);
+      if (!medCovers(m, ds)) continue;
+      const t = takenOn(m, ds);
+      const dots = Array.from({ length: per }, (_, k) => (t.includes(k) ? '●' : '○')).join('');
+      const cls = t.length >= per ? 'full' : t.length ? 'part' : 'none';
+      cells.push(`
+        <button type="button" class="dose-day ${cls}${ds === date ? ' cur' : ''}" data-act="goto" data-d="${ds}">
+          <span class="dd-dots">${dots}</span>
+          <span class="dd-lbl">${ds === D.todayStr() ? '今' : md(ds).replace('/', '.')}</span>
+        </button>`);
+    }
+    return cells.length > 1 ? `<div class="dose-strip">${cells.join('')}</div>` : '';
+  }
+  // 打卡区（只有「这天在疗程里」才出现）
+  function doseBlockHTML(m, date) {
+    const per = dosePer(m);
+    const labels = doseLabels(m);
+    const t = takenOn(m, date);
+    const dayWord = date === D.todayStr() ? '今天' : '这天';
+    const btns = labels.map((lb, i) => {
+      const on = t.includes(i);
+      return `<button type="button" class="dose-btn${on ? ' on' : ''}" data-act="dose" data-i="${i}">${per === 1 ? '' : lb + ' '}${on ? '✓ 已吃' : '○ 点一下'}</button>`;
+    }).join('');
+    const stats = doseStats(m);
+    return `
+      <div class="med-doses">
+        <div class="dose-row">${btns}</div>
+        ${t.length < per ? `<button type="button" class="med-mini" data-act="fill" style="margin-top:8px">${dayWord}${per === 1 ? '' : '都'}吃了，一起勾</button>` : ''}
+        ${doseStripHTML(m, date)}
+        ${stats ? `<div class="med-stat">${stats}</div>` : ''}
+      </div>`;
+  }
+
   function medItemHTML(m, date) {
     const covers = medCovers(m, date);
     const n = medDayNo(m, date);
@@ -164,10 +249,12 @@ window.Views = (function () {
         </div>
         <div class="med-meta">${meta}</div>
         ${bar}
+        ${covers ? doseBlockHTML(m, date) : ''}
+        ${(!covers && cls === 'done' && doseStats(m)) ? `<div class="med-stat">${doseStats(m)}</div>` : ''}
         ${(m.note || '').trim() ? `<div class="med-note">${esc(m.note)}</div>` : ''}
         <div class="med-acts">
           <button type="button" class="med-mini" data-act="edit">编辑</button>
-          ${(!m.end && m.start <= D.todayStr()) ? '<button type="button" class="med-mini" data-act="stop">今天吃完了</button>' : ''}
+          ${(!m.end && m.start <= D.todayStr()) ? '<button type="button" class="med-mini" data-act="stop">结束这个疗程</button>' : ''}
         </div>
       </div>`;
   }
@@ -176,17 +263,27 @@ window.Views = (function () {
   function medBoxHTML(date) {
     const list = medList(date);
     const cur = list.filter((m) => medCovers(m, date));
-    const badge = cur.length === 0
-      ? (list.length ? '<span class="med-badge idle">没在吃</span>' : '')
-      : cur.length === 1
-        ? `<span class="med-badge">第 ${medDayNo(cur[0], date)} 天</span>`
-        : `<span class="med-badge">${cur.length} 个在吃</span>`;
+    let badge;
+    if (cur.length === 0) {
+      badge = list.length ? '<span class="med-badge idle">没在吃</span>' : '';
+    } else if (cur.length === 1) {
+      // 不展开也要能回答「早上那顿吃了没」：第 N 天 + 这天的勾选情况
+      const m = cur[0];
+      const t = takenOn(m, date);
+      const marks = dosePer(m) === 1
+        ? (t.length ? '已吃 ✓' : '还没吃')
+        : doseLabels(m).map((lb, i) => `${lb}${t.includes(i) ? '✓' : '○'}`).join(' ');
+      badge = `<span class="med-badge">第 ${medDayNo(m, date)} 天</span>`
+            + `<span class="med-badge dose${t.length >= dosePer(m) ? ' full' : ''}">${marks}</span>`;
+    } else {
+      badge = `<span class="med-badge">${cur.length} 个在吃</span>`;
+    }
     const body = list.length
       ? list.map((m) => medItemHTML(m, date)).join('')
-      : '<div class="sum-empty">还没记过疗程。医生开了药，就在这里记一笔「从哪天开始吃」，之后每天自动帮你数到第几天。</div>';
+      : '<div class="sum-empty">还没记过疗程。医生开了药，就在这里记一笔「从哪天开始吃」，之后每天自动帮你数到第几天、吃了哪顿。</div>';
     return `
       <summary class="scan-sum">
-        <span>用药 / 疗程 <span class="sub">记开始日期 · 自动数第几天</span></span>
+        <span>用药 / 疗程${cur.length ? '' : ' <span class="sub">记开始日期 · 自动数第几天</span>'}</span>
         <span class="med-sum-right">${badge}<span class="caret">▾</span></span>
       </summary>
       <div class="med-body">
@@ -206,10 +303,32 @@ window.Views = (function () {
     box.querySelectorAll('.med-item').forEach((el) => {
       el.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-act]'); if (!btn) return;
+        const act = btn.dataset.act;
         const m = Store.getMeds().find((x) => x.id === el.dataset.id); if (!m) return;
-        if (btn.dataset.act === 'edit') {
+
+        if (act === 'edit') {
           openMedEditor(m, date, () => renderMedBox(date));
-        } else {
+
+        } else if (act === 'dose') {
+          const i = parseInt(btn.dataset.i, 10);
+          const on = !takenOn(m, date).includes(i);
+          const n = setDose(m.id, date, i, on);
+          renderMedBox(date);
+          // 每勾一次都弹提示太吵，只在这天吃齐了的时候说一声
+          if (on && n >= dosePer(m)) toast(`${date === D.todayStr() ? '今天' : '这天'}的药吃齐了 ✓`);
+
+        } else if (act === 'fill') {
+          fillDoses(m.id, date);
+          renderMedBox(date);
+          toast('已补记 ✓');
+
+        } else if (act === 'goto') {
+          // 跳到那天，用同一套「早/晚」按钮补勾，不另发明一套补记逻辑
+          const ds = btn.dataset.d;
+          if (ds === date) return;
+          saveCur(true).then(() => { state.date = ds; record(); });
+
+        } else if (act === 'stop') {
           const today = D.todayStr();
           if (today < m.start) { toast('这个疗程还没开始'); return; }
           const list = Store.getMeds();
@@ -226,7 +345,9 @@ window.Views = (function () {
   /* 新增 / 编辑一个疗程；med=null 就是新增 */
   function openMedEditor(med, viewDate, onDone) {
     const isNew = !med;
-    const m = Object.assign({ id: medId(), name: '', start: D.todayStr(), end: '', days: null, note: '' }, med || {});
+    const m = Object.assign({ id: medId(), name: '', start: D.todayStr(), end: '', days: null, perDay: 2, taken: {}, note: '' }, med || {});
+    m.perDay = dosePer(m);
+    m.taken = m.taken || {};
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     document.body.appendChild(overlay);
@@ -246,6 +367,13 @@ window.Views = (function () {
             <span class="date-field-text" id="me-start-t">${D.human(m.start)}</span>
             <span class="date-field-btn"><span>选择</span><span class="caret">▾</span></span>
           </button>
+        </div>
+        <div class="field">
+          <label>一天吃几次 <span class="sub">决定每天勾几格</span></label>
+          <div class="seg dose" id="me-per">
+            ${[1, 2, 3, 4].map((n) => `<button type="button" data-n="${n}" class="${n === m.perDay ? 'on' : ''}">${n === 1 ? '1 次' : n + ' 次'}</button>`).join('')}
+          </div>
+          <div class="sub" style="margin-top:8px">一天两次就是「早 / 晚」两格，吃一次勾一次。</div>
         </div>
         <div class="field">
           <label>计划吃几天 <span class="sub">不确定就留空</span></label>
@@ -274,6 +402,14 @@ window.Views = (function () {
     overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
     overlay.querySelector('#me-cancel').addEventListener('click', close);
 
+    const perBox = overlay.querySelector('#me-per');
+    perBox.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-n]'); if (!b) return;
+      perBox.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      m.perDay = parseInt(b.dataset.n, 10);
+    });
+
     overlay.querySelector('#me-start').addEventListener('click', () => {
       openDatePicker(m.start, FAR, (picked) => {
         m.start = picked;
@@ -300,6 +436,11 @@ window.Views = (function () {
       const dv = parseInt(overlay.querySelector('#me-days').value, 10);
       m.days = (dv && dv > 0) ? Math.min(dv, 180) : null;
       if (m.end && m.end < m.start) { toast('结束日期比开始日期还早'); return; }
+      // 把「一天几次」改少了，超出的旧勾选就没地方显示了，顺手清掉
+      Object.keys(m.taken).forEach((d) => {
+        const keep = m.taken[d].filter((i) => i < m.perDay);
+        if (keep.length) m.taken[d] = keep; else delete m.taken[d];
+      });
       const list = Store.getMeds();
       const i = list.findIndex((x) => x.id === m.id);
       if (i >= 0) list[i] = m; else list.push(m);

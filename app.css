@@ -231,6 +231,33 @@ body {
   margin-top: 9px; padding: 8px 10px; background: var(--pink-bg); border-radius: 10px;
   font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
 }
+/* 一次一勾的打卡区 */
+.med-doses { margin-top: 11px; }
+.dose-row { display: flex; gap: 8px; }
+.dose-btn {
+  flex: 1; min-height: 46px; border-radius: 12px; cursor: pointer; font-family: inherit;
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink-soft);
+  font-size: 14px; font-weight: 600;
+}
+.dose-btn:active { transform: scale(.98); }
+.dose-btn.on { background: var(--amber); border-color: var(--amber); color: #fff; }
+.dose-strip { display: flex; gap: 5px; margin-top: 10px; }
+.dose-day {
+  flex: 1; min-width: 0; border: 1.5px solid var(--line); background: #fff;
+  border-radius: 10px; padding: 6px 2px; font-family: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.dose-day .dd-dots { font-size: 10px; letter-spacing: 1px; color: var(--ink-soft); line-height: 1.2; }
+.dose-day .dd-lbl { font-size: 10.5px; color: var(--ink-soft); }
+.dose-day.full { background: #fdf4e8; border-color: #ecd9bd; }
+.dose-day.full .dd-dots { color: var(--amber); }
+.dose-day.none .dd-dots { color: #d8cfc6; }
+.dose-day.cur { box-shadow: inset 0 0 0 1.5px var(--amber); }
+.med-stat { font-size: 12.5px; color: var(--ink-soft); margin-top: 9px; }
+.med-badge.dose { background: #ece4da; color: #7d6f60; letter-spacing: .5px; }
+.med-badge.dose.full { background: var(--amber); color: #fff; }
+.seg.dose button.on { background: var(--amber); }
+
 .med-acts { display: flex; gap: 8px; margin-top: 10px; }
 .med-mini {
   border: 1.5px solid var(--line); background: #fff; color: var(--ink-soft);
