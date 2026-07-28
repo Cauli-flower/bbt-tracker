@@ -118,6 +118,203 @@ window.Views = (function () {
     if (ds) ds.innerHTML = daySummaryHTML(isEmpty(_cur) ? null : _cur);
   }
 
+  /* ---------------- 用药疗程 ---------------- */
+  // 名称/备忘是自己输入的文字，进 innerHTML 前先转义
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  }
+  const medId = () => 'm' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+  // 排序：在吃的排最前，其次还没开始的，最后是吃完的；同组内新的在前
+  function medList(date) {
+    const d = date || D.todayStr();
+    const rank = (m) => (medCovers(m, d) ? 0 : m.start > d ? 1 : 2);
+    return Store.getMeds().slice().sort((a, b) => (rank(a) - rank(b)) || (a.start < b.start ? 1 : a.start > b.start ? -1 : 0));
+  }
+  // 这一天在不在这个疗程里（含开始/结束当天）
+  function medCovers(m, date) { return m.start <= date && (!m.end || m.end >= date); }
+  function medDayNo(m, date) { return D.diffDays(m.start, date) + 1; }
+  const md = (s) => s.slice(5).replace('-', '/');   // 2026-07-28 → 07/28
+  // 计划结束日：开始日 + 天数 - 1
+  function medPlanEnd(m) { return m.days ? D.addDays(m.start, m.days - 1) : ''; }
+
+  function medItemHTML(m, date) {
+    const covers = medCovers(m, date);
+    const n = medDayNo(m, date);
+    let status, cls;
+    if (m.start > date) { status = `${md(m.start)} 开始`; cls = 'soon'; }
+    else if (covers) { status = `第 ${n} 天${m.days ? ` / 共 ${m.days} 天` : ''}`; cls = 'on'; }
+    else { status = '已结束'; cls = 'done'; }
+
+    const planEnd = medPlanEnd(m);
+    const meta = [
+      m.end ? `${md(m.start)} – ${md(m.end)}（共 ${D.diffDays(m.start, m.end) + 1} 天）`
+            : `${md(m.start)} 开始${planEnd ? `，按计划吃到 ${md(planEnd)}` : ''}`,
+    ].join('');
+
+    let bar = '';
+    if (cls === 'on' && m.days) {
+      const pct = Math.max(0, Math.min(100, Math.round(n / m.days * 100)));
+      bar = `<div class="med-bar"><i style="width:${pct}%"></i></div>`;
+    }
+    return `
+      <div class="med-item ${cls}" data-id="${m.id}">
+        <div class="med-top">
+          <span class="med-name">${esc(m.name) || '未命名疗程'}</span>
+          <span class="med-day">${status}</span>
+        </div>
+        <div class="med-meta">${meta}</div>
+        ${bar}
+        ${(m.note || '').trim() ? `<div class="med-note">${esc(m.note)}</div>` : ''}
+        <div class="med-acts">
+          <button type="button" class="med-mini" data-act="edit">编辑</button>
+          ${(!m.end && m.start <= D.todayStr()) ? '<button type="button" class="med-mini" data-act="stop">今天吃完了</button>' : ''}
+        </div>
+      </div>`;
+  }
+
+  // 折叠卡整体（summary 上直接显示「第 N 天」，不用展开也看得到）
+  function medBoxHTML(date) {
+    const list = medList(date);
+    const cur = list.filter((m) => medCovers(m, date));
+    const badge = cur.length === 0
+      ? (list.length ? '<span class="med-badge idle">没在吃</span>' : '')
+      : cur.length === 1
+        ? `<span class="med-badge">第 ${medDayNo(cur[0], date)} 天</span>`
+        : `<span class="med-badge">${cur.length} 个在吃</span>`;
+    const body = list.length
+      ? list.map((m) => medItemHTML(m, date)).join('')
+      : '<div class="sum-empty">还没记过疗程。医生开了药，就在这里记一笔「从哪天开始吃」，之后每天自动帮你数到第几天。</div>';
+    return `
+      <summary class="scan-sum">
+        <span>用药 / 疗程 <span class="sub">记开始日期 · 自动数第几天</span></span>
+        <span class="med-sum-right">${badge}<span class="caret">▾</span></span>
+      </summary>
+      <div class="med-body">
+        ${body}
+        <button type="button" class="btn ghost" id="med-add" style="margin-top:12px;padding:11px;font-size:14px">＋ 新增一个疗程</button>
+      </div>`;
+  }
+
+  // 渲染 / 重新渲染记录页里的用药卡（只重画这一块，不动当天正在填的内容）
+  function renderMedBox(date) {
+    const box = document.getElementById('med-box');
+    if (!box) return;
+    box.innerHTML = medBoxHTML(date);
+    box.querySelector('#med-add').addEventListener('click', () => {
+      openMedEditor(null, date, () => renderMedBox(date));
+    });
+    box.querySelectorAll('.med-item').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]'); if (!btn) return;
+        const m = Store.getMeds().find((x) => x.id === el.dataset.id); if (!m) return;
+        if (btn.dataset.act === 'edit') {
+          openMedEditor(m, date, () => renderMedBox(date));
+        } else {
+          const today = D.todayStr();
+          if (today < m.start) { toast('这个疗程还没开始'); return; }
+          const list = Store.getMeds();
+          const t = list.find((x) => x.id === m.id);
+          t.end = today;
+          Store.saveMeds(list);
+          renderMedBox(date);
+          toast(`已记：吃到今天，共 ${D.diffDays(t.start, today) + 1} 天 ✓`);
+        }
+      });
+    });
+  }
+
+  /* 新增 / 编辑一个疗程；med=null 就是新增 */
+  function openMedEditor(med, viewDate, onDone) {
+    const isNew = !med;
+    const m = Object.assign({ id: medId(), name: '', start: D.todayStr(), end: '', days: null, note: '' }, med || {});
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    const FAR = D.addDays(D.todayStr(), 365);   // 允许把开始日期定在将来（医生说下周期再开始吃）
+
+    overlay.innerHTML = `
+      <div class="dp-card med-edit">
+        <div class="np-title">${isNew ? '新增疗程' : '编辑疗程'}</div>
+        <div class="field">
+          <label>名称 <span class="sub">自己认得就行</span></label>
+          <input type="text" id="me-name" class="med-input" value="${esc(m.name)}" placeholder="例：第 1 个疗程">
+        </div>
+        <div class="field">
+          <label>从哪天开始吃</label>
+          <button type="button" class="date-field" id="me-start">
+            <span class="date-field-text" id="me-start-t">${D.human(m.start)}</span>
+            <span class="date-field-btn"><span>选择</span><span class="caret">▾</span></span>
+          </button>
+        </div>
+        <div class="field">
+          <label>计划吃几天 <span class="sub">不确定就留空</span></label>
+          <input type="number" id="me-days" class="med-input" min="1" max="180" value="${m.days || ''}" placeholder="例：10">
+        </div>
+        <div class="field">
+          <label>结束日期 <span class="sub">还在吃就留空</span></label>
+          <button type="button" class="date-field" id="me-end">
+            <span class="date-field-text" id="me-end-t">${m.end ? D.human(m.end) : '还在吃'}</span>
+            <span class="date-field-btn"><span>选择</span><span class="caret">▾</span></span>
+          </button>
+          <button type="button" class="med-mini" id="me-end-clear" style="margin-top:8px;${m.end ? '' : 'display:none'}">清掉结束日期（还在吃）</button>
+        </div>
+        <div class="field">
+          <label>备忘</label>
+          <textarea id="me-note" placeholder="怎么吃、医生怎么交代的、吃了什么感觉……">${esc(m.note)}</textarea>
+        </div>
+        <div class="np-actions">
+          <button class="np-cancel" id="me-cancel">取消</button>
+          <button class="np-ok" id="me-ok">保存</button>
+        </div>
+        ${isNew ? '' : '<button type="button" class="med-mini danger" id="me-del" style="margin-top:12px;width:100%;padding:10px">删除这个疗程</button>'}
+      </div>`;
+
+    // 表单里在打字，误点遮罩关掉会丢内容，所以只能用「取消」关
+    overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+    overlay.querySelector('#me-cancel').addEventListener('click', close);
+
+    overlay.querySelector('#me-start').addEventListener('click', () => {
+      openDatePicker(m.start, FAR, (picked) => {
+        m.start = picked;
+        overlay.querySelector('#me-start-t').textContent = D.human(picked);
+      });
+    });
+    const endClear = overlay.querySelector('#me-end-clear');
+    overlay.querySelector('#me-end').addEventListener('click', () => {
+      openDatePicker(m.end || D.todayStr(), FAR, (picked) => {
+        m.end = picked;
+        overlay.querySelector('#me-end-t').textContent = D.human(picked);
+        endClear.style.display = '';
+      });
+    });
+    endClear.addEventListener('click', () => {
+      m.end = '';
+      overlay.querySelector('#me-end-t').textContent = '还在吃';
+      endClear.style.display = 'none';
+    });
+
+    overlay.querySelector('#me-ok').addEventListener('click', () => {
+      m.name = overlay.querySelector('#me-name').value.trim();
+      m.note = overlay.querySelector('#me-note').value;
+      const dv = parseInt(overlay.querySelector('#me-days').value, 10);
+      m.days = (dv && dv > 0) ? Math.min(dv, 180) : null;
+      if (m.end && m.end < m.start) { toast('结束日期比开始日期还早'); return; }
+      const list = Store.getMeds();
+      const i = list.findIndex((x) => x.id === m.id);
+      if (i >= 0) list[i] = m; else list.push(m);
+      Store.saveMeds(list);
+      close(); onDone(); toast(isNew ? '疗程已记下 ✓' : '已更新 ✓');
+    });
+
+    const delBtn = overlay.querySelector('#me-del');
+    if (delBtn) delBtn.addEventListener('click', () => {
+      if (!confirm('删除这个疗程？记录里的备忘也会一起没了。')) return;
+      Store.saveMeds(Store.getMeds().filter((x) => x.id !== m.id));
+      close(); onDone(); toast('已删除');
+    });
+  }
+
   /* ---------------- 工具 ---------------- */
   function seg(group, name, options, current) {
     return `<div class="seg ${group}" data-seg="${name}">` +
@@ -329,6 +526,8 @@ window.Views = (function () {
         <div id="day-summary">${daySummaryHTML(saved)}</div>
       </div>
 
+      <details class="card scan-card med-card" id="med-box" ${medList(date).some((m) => medCovers(m, date)) ? 'open' : ''}></details>
+
       <div class="card">
         <div class="field">
           <label>基础体温 <span class="sub">℃ · 建议每天晨起、同一时间测量</span></label>
@@ -438,6 +637,7 @@ window.Views = (function () {
 
     // 新载入的一天视为「已保存」状态
     _dirty = false; renderStatus();
+    renderMedBox(date);   // 用药疗程卡（独立于当天记录，单独存、单独重画）
 
     // —— 绑定 ——
     // 体温：自定义数字键盘
@@ -1104,6 +1304,7 @@ window.Views = (function () {
     $title().textContent = '设置'; $sub().textContent = '';
     const s = Store.getSettings();
     const days = await Store.allDays();
+    const meds = Store.getMeds();
     const c = $app();
     c.innerHTML = `
       <div class="card">
@@ -1114,7 +1315,7 @@ window.Views = (function () {
 
       <div class="card">
         <h2>数据备份</h2>
-        <p class="muted" style="margin-top:0">共 ${days.length} 天记录。数据只存在本机，换手机时请先导出备份。</p>
+        <p class="muted" style="margin-top:0">共 ${days.length} 天记录${meds.length ? ` · ${meds.length} 个疗程` : ''}。数据只存在本机，换手机时请先导出备份（备份含用药疗程）。</p>
         <button class="btn secondary" id="btn-export">导出备份文件</button>
         <button class="btn secondary" id="btn-import">从备份文件恢复</button>
         <input type="file" id="file-input" accept="application/json,.json" style="display:none" />
@@ -1171,7 +1372,7 @@ window.Views = (function () {
       Store.saveSettings({ avgCycle, avgLuteal }); toast('已保存校准 ✓');
     });
     c.querySelector('#btn-reset').addEventListener('click', async () => {
-      if (confirm('这会删除全部记录，且无法恢复。\n建议先导出备份。确定清空？')) {
+      if (confirm('这会删除全部记录（含用药疗程），且无法恢复。\n建议先导出备份。确定清空？')) {
         await Store.clearAll(); toast('已清空'); settings();
       }
     });

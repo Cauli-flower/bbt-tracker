@@ -21,6 +21,8 @@
  *     }
  *   }
  *
+ * 用药疗程（跨很多天的一件事，不属于某一天）单独存一份，见下方 getMeds。
+ *
  * 设置（周期长度等校准值）保存在 localStorage。
  */
 window.Store = (function () {
@@ -29,6 +31,7 @@ window.Store = (function () {
   const STORE = 'days';
   const PHOTOS = 'lhphotos';        // 试纸照片：{ date, img(压缩后的dataURL) }
   const SETTINGS_KEY = 'thermo-settings';
+  const MEDS_KEY = 'thermo-meds';   // 用药疗程列表
 
   let _db = null;
 
@@ -144,13 +147,39 @@ window.Store = (function () {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(getSettings(), s)));
   }
 
+  // ---------- 用药疗程 ----------
+  /* 一个疗程一条，跨天，不挂在某一天下面：
+   *   {
+   *     id:    "m1a2b3",
+   *     name:  "第 1 个疗程",        // 自己怎么叫都行
+   *     start: "2026-07-28",        // 从哪天开始吃
+   *     end:   "" | "2026-08-06",   // 空 = 还在吃
+   *     days:  10 | null,           // 计划吃几天（可选），用来算「第 3/10 天」和预计结束日
+   *     note:  "",                  // 备忘：怎么吃、医生怎么说、吃了什么感觉
+   *   }
+   */
+  function getMeds() {
+    try {
+      const raw = localStorage.getItem(MEDS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveMeds(list) {
+    localStorage.setItem(MEDS_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+  }
+
   // ---------- 导出 / 导入 ----------
   function exportAll() {
     return allDays().then((days) => ({
       app: 'thermo-log',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       settings: getSettings(),
+      meds: getMeds(),
       days,
     }));
   }
@@ -161,6 +190,7 @@ window.Store = (function () {
       return Promise.reject(new Error('文件格式不正确'));
     }
     if (data.settings) saveSettings(data.settings);
+    if (Array.isArray(data.meds)) saveMeds(data.meds);   // 老备份没有这项就保持现状
     return tx('readwrite').then((os) => new Promise((res, rej) => {
       let n = 0;
       data.days.forEach((d) => { if (d && d.date) { os.put(d); n++; } });
@@ -169,8 +199,9 @@ window.Store = (function () {
     }));
   }
 
-  // 清空全部（设置页"重置"用）：每日记录 + 试纸照片一起清
+  // 清空全部（设置页"重置"用）：每日记录 + 试纸照片 + 用药疗程一起清
   function clearAll() {
+    saveMeds([]);
     return open().then((db) => new Promise((res, rej) => {
       const t = db.transaction([STORE, PHOTOS], 'readwrite');
       t.objectStore(STORE).clear();
@@ -184,6 +215,7 @@ window.Store = (function () {
     getDay, putDay, deleteDay, allDays,
     putPhoto, getPhoto, deletePhoto, allPhotos,
     getSettings, saveSettings,
+    getMeds, saveMeds,
     exportAll, importAll, clearAll,
   };
 })();
