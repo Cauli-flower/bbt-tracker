@@ -17,7 +17,7 @@ window.Views = (function () {
   let _cur = null; // 记录页工作副本
 
   function blank(date) {
-    return { date, temp: null, tempTime: '', period: 'none', breakthrough: false, lh: 'none', mucus: 'none', intercourse: false, note: '', scan: blankScan() };
+    return { date, temp: null, tempTime: '', period: 'none', breakthrough: false, withdrawal: false, lh: 'none', mucus: 'none', intercourse: false, note: '', scan: blankScan() };
   }
   function blankScan() {
     return { lA: null, lB: null, rA: null, rB: null, thick: null, stage: '' };
@@ -99,7 +99,7 @@ window.Views = (function () {
     if (!rec || isEmpty(rec)) return '<div class="sum-empty">这一天还没有保存任何记录。填好后记得点下面「保存」。</div>';
     const chips = [];
     if (rec.temp != null) chips.push(`<span class="sum-chip">体温 <b>${rec.temp.toFixed(2)}℃</b>${rec.tempTime ? ' · ' + rec.tempTime : ''}</span>`);
-    if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : ''}</span>`);
+    if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : (rec.withdrawal ? ' · 停药撤退性出血' : '')}</span>`);
     if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
     if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
     if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
@@ -694,11 +694,15 @@ window.Views = (function () {
           ], _cur.period)}
           <label class="brk-toggle" id="brk-row" style="${_cur.period === 'none' ? 'display:none' : ''}">
             <input type="checkbox" id="f-breakthrough" ${_cur.breakthrough ? 'checked' : ''}>
-            <span>这次是无排卵出血（突破性）<span class="sub">不算新周期起点，天数继续往下数；曲线上用空心圈标</span></span>
+            <span>这次是无排卵出血（突破性）<span class="sub">自己乱掉的血，<b>不算</b>新周期起点，天数继续往下数；曲线上用空心圈标</span></span>
+          </label>
+          <label class="brk-toggle" id="wd-row" style="${_cur.period === 'none' ? 'display:none' : ''}">
+            <input type="checkbox" id="f-withdrawal" ${_cur.withdrawal ? 'checked' : ''}>
+            <span>这次是停药后的撤退性出血<span class="sub">吃了孕激素、停药后来的血，<b>算</b>新周期第 1 天——周期真的被重置了</span></span>
           </label>
           <div class="sub" style="margin-top:8px"><b>怎么记：</b>流血的<b>每一天都照常选经量</b>（少/中/多），中间别空着——空一天，后面再记就会被当成一段新的出血。
-            勾选只需在这段里<b>勾一天</b>，整段都会按无排卵出血算。</div>
-          <div class="sub" style="margin-top:4px">误记成月经了？把经量改回“无”即可，周期会自动重算。</div>
+            勾选只需在这段里<b>勾一天</b>，整段都会按那一类算。两个勾是二选一。</div>
+          <div class="sub" style="margin-top:4px">都不勾＝当成自然来的真月经，也算新周期第 1 天。误记成月经了？把经量改回“无”即可，周期会自动重算。</div>
         </div>
         <div class="field">
           <label>排卵试纸 LH</label>
@@ -804,16 +808,31 @@ window.Views = (function () {
       if (name === 'intercourse') _cur.intercourse = (val === 'yes');
       else if (name === 'stage') _cur.scan.stage = val;
       else _cur[name] = val;
-      // 经量改动时，联动「无排卵出血」开关的显隐；改回「无」则清掉该标记
+      // 经量改动时，联动两个出血类型开关的显隐；改回「无」则清掉标记
       if (name === 'period') {
-        const brkRow = c.querySelector('#brk-row');
-        if (brkRow) brkRow.style.display = val === 'none' ? 'none' : '';
-        if (val === 'none') { _cur.breakthrough = false; const cb = c.querySelector('#f-breakthrough'); if (cb) cb.checked = false; }
+        ['#brk-row', '#wd-row'].forEach((sel) => {
+          const row = c.querySelector(sel);
+          if (row) row.style.display = val === 'none' ? 'none' : '';
+        });
+        if (val === 'none') {
+          _cur.breakthrough = false; _cur.withdrawal = false;
+          ['#f-breakthrough', '#f-withdrawal'].forEach((sel) => { const cb = c.querySelector(sel); if (cb) cb.checked = false; });
+        }
       }
       markDirty();
     });
-    const brkCb = c.querySelector('#f-breakthrough');
-    if (brkCb) brkCb.addEventListener('change', (e) => { _cur.breakthrough = e.target.checked; markDirty(); });
+    // 「无排卵出血」和「撤退性出血」互斥：一个是不算起点，一个是算起点，不可能同时成立
+    const brkCb = c.querySelector('#f-breakthrough'), wdCb = c.querySelector('#f-withdrawal');
+    if (brkCb) brkCb.addEventListener('change', (e) => {
+      _cur.breakthrough = e.target.checked;
+      if (e.target.checked && wdCb) { _cur.withdrawal = false; wdCb.checked = false; }
+      markDirty();
+    });
+    if (wdCb) wdCb.addEventListener('change', (e) => {
+      _cur.withdrawal = e.target.checked;
+      if (e.target.checked && brkCb) { _cur.breakthrough = false; brkCb.checked = false; }
+      markDirty();
+    });
 
     // 监测：长/宽、内层厚度都走同一个数字键盘
     const SCAN_F = {
@@ -967,7 +986,7 @@ window.Views = (function () {
     if (!_cur) return;
     if (isEmpty(_cur)) { await Store.deleteDay(_cur.date); return; }
     const rec = Object.assign({}, _cur);
-    if (rec.period === 'none') rec.breakthrough = false; // 没出血就不留「无排卵出血」标记
+    if (rec.period === 'none') { rec.breakthrough = false; rec.withdrawal = false; } // 没出血就不留出血类型标记
     if (hasScan(rec)) rec.scan = Object.assign({}, rec.scan);
     else delete rec.scan;   // 没填监测就不写这个字段，免得每天都存一堆空值
     await Store.putDay(rec);
@@ -1038,7 +1057,7 @@ window.Views = (function () {
 
     const options = cycles.map((cy) => {
       const nb = (cy.breakthroughs || []).length;
-      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
+      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.medStart ? '·药物重置' : ''}${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
       return `<option value="${cy.index}" ${cy.index === idx ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
@@ -1066,6 +1085,7 @@ window.Views = (function () {
         ${a.lhHint ? `<div style="margin-top:8px">🔎 ${a.lhHint}</div>` : ''}
         ${a.lhSurge ? `<div style="margin-top:8px">📈 试纸在 ${D.human(a.lhSurge.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[a.lhSurge.from]}→${LH_L[a.lhSurge.to]}），LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${a.lhSurge.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>` : ''}
         ${a.lhCaveat ? `<div style="margin-top:8px;color:#877049">⚠️ ${a.lhCaveat}</div>` : ''}
+        ${a.medStartNote ? `<div style="margin-top:8px">💊 ${a.medStartNote}</div>` : ''}
         ${a.breakthroughNote ? `<div style="margin-top:8px">🩸 ${a.breakthroughNote}</div>` : ''}
         ${a.shortLuteal ? `<div style="margin-top:8px;color:#877049">⚠️ 黄体期偏短（<10 天），若多个周期如此可咨询医生。</div>` : ''}
       </div>
@@ -1193,7 +1213,7 @@ window.Views = (function () {
       : '这天没记体温';
     const chips = [];
     if (rec) {
-      if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : ''}</span>`);
+      if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : (rec.withdrawal ? ' · 停药撤退性出血' : '')}</span>`);
       if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
       if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
       if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
@@ -1243,7 +1263,7 @@ window.Views = (function () {
       else if (a.classification === 'anovulatory') status = 'anovulatory';
       return {
         index: cy.index, start: cy.start, length: Math.max(1, length),
-        isOpen: cy.isOpen, status, ovuCD: a.ovuCD,
+        isOpen: cy.isOpen, status, ovuCD: a.ovuCD, medStart: !!cy.medStart,
         // 中途的无排卵出血：在同一条横条上打标记，不另起一行、不另算一个周期
         brkCDs: (cy.breakthroughs || []).map((b) => D.diffDays(cy.start, b) + 1),
       };
@@ -1269,6 +1289,7 @@ window.Views = (function () {
         <div style="width:60px;flex-shrink:0;line-height:1.3">
           <div style="font-size:12px;font-weight:600;color:#555">周期${r.index}</div>
           <div style="font-size:11px;color:#999">${r.start.slice(5)}·${r.length}天</div>
+          ${r.medStart ? `<div style="font-size:10px;color:#7d6f96">💊药物重置</div>` : ''}
           ${r.brkCDs.length ? `<div style="font-size:10px;color:#b5837c">含${r.brkCDs.length}次出血</div>` : ''}
         </div>
         <div style="position:relative;flex:1;height:24px;background:#f3eef0;border-radius:6px;overflow:hidden">
@@ -1437,14 +1458,20 @@ window.Views = (function () {
       <div>最近 ${s.recordedCycles} 个周期长度在 ${s.minCycle}–${s.maxCycle} 天之间波动较大，所以日历推算只能给个大概范围。
       更建议看“实时信号”——试纸强阳、蛋清拉丝、体温升高，而不是日历预测。</div></div>` : '';
 
+    const startTxt = s.currentStart ? s.currentStart.slice(5).replace('-', ' 月 ') + ' 日' : '';
+    // 这个周期是吃药重置出来的 → 说清楚第 1 天就是撤退性出血那天
+    const medTip = s.currentMedStart ? `<div class="verdict pending" style="margin-bottom:14px">
+      <div class="vtitle">💊 这个周期是吃药重置出来的</div>
+      <div>第 1 天 ＝ 停药后撤退性出血那天（${startTxt}），今天是<b>第 ${s.currentCD} 天</b>。
+      孕激素把内层转成分泌期、停药后整层一起脱落，等于人为造了一次月经，
+      所以这次<b>是真的重置了周期</b>——之后复查、算排卵都按这个起点数。</div></div>` : '';
     // 中途掉过血时，说清楚天数为什么没从 1 重新数
     const brkTip = s.currentBrk ? `<div class="verdict pending" style="margin-bottom:14px">
       <div class="vtitle">这个周期中途掉过 ${s.currentBrk} 次血</div>
-      <div>那是「无排卵出血」——没排卵就没有黄体，不是真月经，所以<b>不另算一个新周期</b>。
-      天数仍从 ${s.currentStart.slice(5).replace('-', '月')}日那次真月经算起，现在是<b>第 ${s.currentCD} 天</b>，
-      也就是这一波已经拖了这么久还没排卵。</div></div>` : '';
+      <div>那是「无排卵出血」——没排卵就没有黄体，内层从没被完整关掉过，不是真月经，所以<b>不另算一个新周期</b>。
+      天数仍从 ${startTxt}那次起算，现在是<b>第 ${s.currentCD} 天</b>，也就是这一波已经拖了这么久还没排卵。</div></div>` : '';
 
-    return banner + brkTip + `<div class="stat-grid" style="margin-bottom:14px">
+    return banner + medTip + brkTip + `<div class="stat-grid" style="margin-bottom:14px">
       <div class="stat"><div class="num" style="${s.irregular ? 'font-size:18px' : ''}">${cycleTxt}</div><div class="lbl">${cycleLbl}</div></div>
       <div class="stat"><div class="num">${cyc}</div><div class="lbl">当前周期第几天</div></div>
       <div class="stat"><div class="num" style="font-size:15px">${np}</div><div class="lbl">预测下次月经</div></div>

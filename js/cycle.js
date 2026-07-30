@@ -58,10 +58,13 @@ window.Cycle = (function () {
 
   /* 把记录按经期开始日切分成周期。
    * 经期开始日 = 该日有经量，且前一天不是经期。
-   * 但勾了「无排卵出血」的那段出血不算新周期起点——没排卵就没有黄体，
-   * 那种出血只是内膜长厚后自己塌了一块，不是真月经。它只在周期里留个标记，
-   * 天数继续往下数，这样「当前周期第几天」才是真的拖了多久。
-   * 返回数组：{ index, start, end, isOpen, days:[按日期升序的本周期记录], breakthroughs:[出血日] }
+   * 三种出血分开对待：
+   *   真月经          → 新周期起点
+   *   无排卵出血      → 不算起点。没排卵就没有黄体，内膜没被完整"关掉"过，
+   *                     出的血是局部塌落，只在周期里留标记，天数继续往下数
+   *   停药后撤退性出血 → 算起点，且标 medStart。吃孕激素把内膜转成分泌期、停药后
+   *                     整层脱落，等于人为造了一次真月经，临床上就当新周期第 1 天
+   * 返回数组：{ index, start, end, isOpen, medStart, days:[...], breakthroughs:[出血日] }
    */
   function buildCycles(allDays) {
     const days = (allDays || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
@@ -69,17 +72,20 @@ window.Cycle = (function () {
     const byDate = {};
     days.forEach((d) => { byDate[d.date] = d; });
 
-    // 找每一段出血的第一天，再分成「真月经起点」和「无排卵出血」两类。
-    // 整段里只要有一天勾了无排卵出血，整段都按无排卵出血算（防止只勾了中间某天）。
-    const starts = [], brkDates = [];
+    // 找每一段出血的第一天，再分成三类。整段里只要有一天勾了就算整段勾了
+    // （防止只勾了中间某天）；撤退性出血优先——它是真起点。
+    const starts = [], brkDates = [], medStarts = {};
     days.forEach((d) => {
       if (!isPeriod(d)) return;
       if (isPeriod(byDate[D.addDays(d.date, -1)])) return; // 同一段出血的第 2、3 天
-      let isBrk = false;
+      let isBrk = false, isMed = false;
       for (let ds = d.date; isPeriod(byDate[ds]); ds = D.addDays(ds, 1)) {
-        if (byDate[ds].breakthrough) { isBrk = true; break; }
+        if (byDate[ds].withdrawal) isMed = true;
+        if (byDate[ds].breakthrough) isBrk = true;
       }
-      if (isBrk) brkDates.push(d.date); else starts.push(d.date);
+      if (isMed) { starts.push(d.date); medStarts[d.date] = true; }
+      else if (isBrk) brkDates.push(d.date);
+      else starts.push(d.date);
     });
 
     const lastDate = days[days.length - 1].date;
@@ -109,6 +115,7 @@ window.Cycle = (function () {
       c.nextStart = c.isOpen ? null : D.addDays(c.end, 1);
       // 本周期中途掉过几次血（每段只记第一天）——不切周期，只作标记
       c.breakthroughs = brkDates.filter((b) => b >= c.start && b <= c.end);
+      c.medStart = !c.noPeriodStart && !!medStarts[c.start];   // 这个周期是吃药重置出来的
     });
     return cycles;
   }
@@ -249,10 +256,24 @@ window.Cycle = (function () {
     if (brk.length) {
       const items = brk.map((b) => `第 ${D.diffDays(start, b) + 1} 天（${D.human(b).replace(/ 周.$/, '')}）`).join('、');
       const ago = cycle.isOpen ? `距今 ${D.diffDays(brk[brk.length - 1], D.todayStr())} 天。` : '';
+      // 内层薄或薄厚不均时，多半不是「长太厚塌掉」，而是激素水平低平/波动、内层修复不良的局部脱落
+      const thin = maxThick(cycle);
+      const why = (thin != null && thin < 10)
+        ? `监测到的内层最厚 ${thin} mm，并不算厚——这种出血多半不是"长太厚塌下来"，` +
+          `而是激素长期低平又有小波动、内层修复不齐，某块先撑不住掉了一点。`
+        : `这类出血是内层局部撑不住掉了一块，不是整层完整脱落。`;
       result.breakthroughNote =
-        `本周期中途掉过 ${brk.length} 次血：${items}。${ago}` +
-        `没排卵就没有黄体，这类出血不是真月经，多半是内膜长厚后自己塌了一块，` +
-        `所以<b>天数没有从 1 重新数</b>——你还在同一个周期里，它没有另算一个周期。`;
+        `本周期中途掉过 ${brk.length} 次血：${items}。${ago}${why}` +
+        `没排卵就没有黄体，内层从没被完整"关掉"过，所以它不是真月经、` +
+        `<b>天数也没有从 1 重新数</b>——你还在同一个周期里。`;
+    }
+
+    // 吃孕激素后停药来的撤退性出血：这是"人造的真月经"，本周期第 1 天就从它算
+    if (cycle.medStart) {
+      result.medStartNote =
+        `本周期从一次<b>停药后的撤退性出血</b>起算（${D.human(start).replace(/ 周.$/, '')} ＝ 第 1 天）。` +
+        `孕激素把内层转成分泌期、停药后整层一起脱落，等于人为造了一次月经，` +
+        `临床上就当新周期第 1 天——所以这次是<b>真的重置了周期</b>，后面的天数、复查时间都按这个起点数。`;
     }
 
     return result;
@@ -290,9 +311,13 @@ window.Cycle = (function () {
 
     const open = cycles.find((c) => c.isOpen);
     if (open && !open.noPeriodStart) {
-      stats.currentCD = D.diffDays(open.start, D.todayStr()) + 1;
-      stats.currentBrk = (open.breakthroughs || []).length;
-      stats.currentStart = open.start;
+      // 起点排在今天之后（提前记了将来某天）就先不报天数，免得出现「第 -5 天」
+      if (open.start <= D.todayStr()) {
+        stats.currentCD = D.diffDays(open.start, D.todayStr()) + 1;
+        stats.currentBrk = (open.breakthroughs || []).length;
+        stats.currentStart = open.start;
+        stats.currentMedStart = !!open.medStart;
+      }
       const nextPeriod = D.addDays(open.start, avgCycle);
       const predictedOvu = D.addDays(nextPeriod, -avgLuteal);
       stats.nextPeriod = nextPeriod;
@@ -321,6 +346,12 @@ window.Cycle = (function () {
       (cycles.find((c) => c.isOpen && !c.noPeriodStart) &&
         D.diffDays(cycles.find((c) => c.isOpen && !c.noPeriodStart).start, D.todayStr()) + 1 > 40);
     return { total, ovulatory, anovulatory, unknown, shortLuteal, recentAnovStreak, suggestSeeDoctor };
+  }
+
+  // 本周期监测到的内层最厚是多少 mm（没记过返回 null）
+  function maxThick(cycle) {
+    const vs = (cycle.days || []).map((d) => d.scan && d.scan.thick).filter((v) => v != null);
+    return vs.length ? Math.max.apply(null, vs) : null;
   }
 
   function avg(arr) { return arr.reduce((s, x) => s + x, 0) / arr.length; }

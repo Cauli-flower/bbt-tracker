@@ -8,7 +8,9 @@
  *     temp:        36.45 | null,          // 基础体温 ℃
  *     tempTime:    "06:30" | "",          // 测量时间（可选）
  *     period:      "none|light|medium|heavy",  // 经量；none = 非经期
- *     breakthrough: true | false,         // 这次出血是「无排卵出血（突破性）」——照样计天，但不计入平均周期统计
+ *     breakthrough: true | false,         // 「无排卵出血（突破性）」——不算新周期起点，天数继续往下数
+ *     withdrawal:  true | false,          // 「停药后撤退性出血」——算新周期第 1 天（人工重置周期）
+ *                                         //   两者互斥；都为 false 且有经量 = 自然来的真月经，也算新周期起点
  *     lh:          "none|negative|weak|strong|fading", // 排卵试纸
  *     mucus:       "none|dry|wet|slippery|sticky|creamy|eggwhite",  // 宫颈黏液（wet/slippery=按感觉记，slippery≈最易孕）
  *     intercourse: true | false,          // 同房
