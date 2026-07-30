@@ -441,6 +441,8 @@ textarea {
 .cal-cell.empty { background: transparent; cursor: default; }
 .cal-cell.today { border-color: var(--pink); }
 .cal-cell.period { background: var(--pink-soft); color: #836863; }
+/* 无排卵出血：空心虚线格，一眼跟真月经（实心）区分——它不另起一个周期 */
+.cal-cell.brk { background: transparent; color: #a2837f; border: 1.5px dashed #d8bdb8; }
 .cal-cell.fertile { background: var(--blue-soft); }
 .cal-cell.ovu { background: var(--blue); color: #fff; font-weight: 700; }
 .cal-cell .marks { position: absolute; bottom: 3px; display: flex; gap: 1px; font-size: 8px; line-height: 1; }

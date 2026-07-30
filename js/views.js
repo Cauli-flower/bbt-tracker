@@ -694,9 +694,11 @@ window.Views = (function () {
           ], _cur.period)}
           <label class="brk-toggle" id="brk-row" style="${_cur.period === 'none' ? 'display:none' : ''}">
             <input type="checkbox" id="f-breakthrough" ${_cur.breakthrough ? 'checked' : ''}>
-            <span>这次是无排卵出血（突破性）<span class="sub">照样计天，但不计入平均周期；曲线上用空心圈标</span></span>
+            <span>这次是无排卵出血（突破性）<span class="sub">不算新周期起点，天数继续往下数；曲线上用空心圈标</span></span>
           </label>
-          <div class="sub" style="margin-top:8px">误记成月经了？把经量改回“无”即可，周期会自动重算。</div>
+          <div class="sub" style="margin-top:8px"><b>怎么记：</b>流血的<b>每一天都照常选经量</b>（少/中/多），中间别空着——空一天，后面再记就会被当成一段新的出血。
+            勾选只需在这段里<b>勾一天</b>，整段都会按无排卵出血算。</div>
+          <div class="sub" style="margin-top:4px">误记成月经了？把经量改回“无”即可，周期会自动重算。</div>
         </div>
         <div class="field">
           <label>排卵试纸 LH</label>
@@ -1035,7 +1037,8 @@ window.Views = (function () {
     const a = analyses[idx];
 
     const options = cycles.map((cy) => {
-      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}）`;
+      const nb = (cy.breakthroughs || []).length;
+      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
       return `<option value="${cy.index}" ${cy.index === idx ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
@@ -1063,6 +1066,7 @@ window.Views = (function () {
         ${a.lhHint ? `<div style="margin-top:8px">🔎 ${a.lhHint}</div>` : ''}
         ${a.lhSurge ? `<div style="margin-top:8px">📈 试纸在 ${D.human(a.lhSurge.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[a.lhSurge.from]}→${LH_L[a.lhSurge.to]}），LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${a.lhSurge.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>` : ''}
         ${a.lhCaveat ? `<div style="margin-top:8px;color:#877049">⚠️ ${a.lhCaveat}</div>` : ''}
+        ${a.breakthroughNote ? `<div style="margin-top:8px">🩸 ${a.breakthroughNote}</div>` : ''}
         ${a.shortLuteal ? `<div style="margin-top:8px;color:#877049">⚠️ 黄体期偏短（<10 天），若多个周期如此可咨询医生。</div>` : ''}
       </div>
 
@@ -1189,7 +1193,7 @@ window.Views = (function () {
       : '这天没记体温';
     const chips = [];
     if (rec) {
-      if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b></span>`);
+      if (PERIOD_L[rec.period]) chips.push(`<span class="sum-chip">经量 <b>${PERIOD_L[rec.period]}</b>${rec.breakthrough ? ' · 无排卵出血' : ''}</span>`);
       if (LH_L[rec.lh]) chips.push(`<span class="sum-chip">试纸 <b>${LH_L[rec.lh]}</b></span>`);
       if (MUCUS_L[rec.mucus]) chips.push(`<span class="sum-chip">黏液 <b>${MUCUS_L[rec.mucus]}</b></span>`);
       if (rec.intercourse) chips.push(`<span class="sum-chip">同房 ${Icons.heart(13, '#ad8a86')}</span>`);
@@ -1240,6 +1244,8 @@ window.Views = (function () {
       return {
         index: cy.index, start: cy.start, length: Math.max(1, length),
         isOpen: cy.isOpen, status, ovuCD: a.ovuCD,
+        // 中途的无排卵出血：在同一条横条上打标记，不另起一行、不另算一个周期
+        brkCDs: (cy.breakthroughs || []).map((b) => D.diffDays(cy.start, b) + 1),
       };
     });
 
@@ -1263,12 +1269,16 @@ window.Views = (function () {
         <div style="width:60px;flex-shrink:0;line-height:1.3">
           <div style="font-size:12px;font-weight:600;color:#555">周期${r.index}</div>
           <div style="font-size:11px;color:#999">${r.start.slice(5)}·${r.length}天</div>
+          ${r.brkCDs.length ? `<div style="font-size:10px;color:#b5837c">含${r.brkCDs.length}次出血</div>` : ''}
         </div>
         <div style="position:relative;flex:1;height:24px;background:#f3eef0;border-radius:6px;overflow:hidden">
           <div style="position:absolute;left:0;top:0;bottom:0;width:${pct(r.length)}%;background:${col.base}"></div>
           ${r.status === 'ovulatory' && r.ovuCD ? `
             <div style="position:absolute;left:${pct(r.ovuCD)}%;width:${lutealW}%;top:0;bottom:0;background:${col.dark}"></div>
             <div style="position:absolute;left:calc(${pct(r.ovuCD)}% - 1px);top:0;bottom:0;width:2px;background:#566b6e"></div>` : ''}
+          ${r.brkCDs.map((cd) => `
+            <div style="position:absolute;left:calc(${pct(cd)}% - 2.5px);top:0;bottom:0;width:5px;background:#fff;opacity:.8"></div>
+            <div style="position:absolute;left:calc(${pct(cd)}% - 1px);top:0;bottom:0;width:2px;background:#c08b84"></div>`).join('')}
         </div>
         <div style="width:46px;flex-shrink:0;text-align:right;font-size:11px;font-weight:600;line-height:1.2;color:${col.txt}">${statLabel(r)}</div>
       </div>`;
@@ -1277,6 +1287,7 @@ window.Views = (function () {
     // 趋势小结（借用既有统计：是否规律 / 长度范围）
     const stats = Cycle.cycleStats(cycles, Store.getSettings());
     const ovuN = rows.filter((r) => r.status === 'ovulatory').length;
+    const brkN = rows.reduce((s, r) => s + r.brkCDs.length, 0);
     let summary;
     if (stats.recordedCycles < 2) {
       summary = '继续每天记录，攒够 2–3 个完整周期后，这里就能看出你的周期是在变规律、还是仍在波动。';
@@ -1289,8 +1300,9 @@ window.Views = (function () {
     c.innerHTML = modeBar + `
       <div class="verdict pending">
         <div class="vtitle">周期概览 · 看是否在变规律</div>
-        <div>每行是一个周期（上＝早，下＝近）。<b>横条越长＝周期越长；绿＝已确认排卵，黄＝未见排卵，灰＝进行中/数据不足；竖线＝排卵日。</b></div>
+        <div>每行是一个周期（上＝早，下＝近）。<b>横条越长＝周期越长；绿＝已确认排卵，黄＝未见排卵，灰＝进行中/数据不足；深色竖线＝排卵日。</b></div>
         <div style="margin-top:8px">${summary}</div>
+        ${brkN ? `<div style="margin-top:8px">🩸 横条上的<b>浅色断口</b>是中途的「无排卵出血」。没排卵就没有黄体，那不是真月经，所以<b>不另算一个周期</b>——它只在原来的周期里留个记号，天数一直往下数。</div>` : ''}
       </div>
       <div class="card">
         ${rows.length ? rowsHTML : '<div class="empty-tip">还没有周期数据。</div>'}
@@ -1298,7 +1310,8 @@ window.Views = (function () {
           <span><i class="dot" style="background:#94a87f"></i>已确认排卵</span>
           <span><i class="dot" style="background:#dcc18f"></i>未见排卵</span>
           <span><i class="dot" style="background:#d6d0d3"></i>进行中/不足</span>
-          <span>｜ 竖线＝排卵日</span>
+          <span>｜ 深色竖线＝排卵日</span>
+          <span><i class="dot" style="background:#c08b84"></i>浅色断口＝无排卵出血(不另算周期)</span>
         </div>
         <div class="sub" style="margin-top:10px">提示：多囊的体温曲线常常很乱，别盯单个月份；<b>看几个月的趋势</b>更靠谱。要精确判断排卵，建议结合生殖科 B 超。</div>
       </div>`;
@@ -1328,6 +1341,7 @@ window.Views = (function () {
       if (stats.fertileWindow) markRange(fertileDays, stats.fertileWindow.start, stats.fertileWindow.end);
     }
     const overview = Cycle.ovulationOverview(cycles);
+    const brkDays = breakthroughDays(byDate, cycles);
 
     const c = $app();
     c.innerHTML = `
@@ -1341,10 +1355,11 @@ window.Views = (function () {
         </div>
         <div class="cal-grid">
           ${['日','一','二','三','四','五','六'].map((w) => `<div class="cal-wd">${w}</div>`).join('')}
-          ${calCells(byDate, cycles, ovuDays, fertileDays)}
+          ${calCells(byDate, cycles, ovuDays, fertileDays, brkDays)}
         </div>
         <div class="legend" style="margin-top:14px">
           <span><i class="dot" style="background:#e3d6d2"></i>经期</span>
+          <span><i class="dot" style="background:#fff;border:1.5px dashed #ad8a86;box-sizing:border-box"></i>无排卵出血(不另算周期)</span>
           <span><i class="dot" style="background:#dde3e2"></i>易孕窗口</span>
           <span><i class="dot" style="background:#8ea1a6"></i>排卵日</span>
           <span>${Icons.heart(12, '#ad8a86')} 同房 · ${Icons.tri(11, '#8ea1a6')} 强阳</span>
@@ -1365,7 +1380,16 @@ window.Views = (function () {
 
   function markRange(map, a, b) { let d = a; let guard = 0; while (d <= b && guard < 60) { map[d] = true; d = D.addDays(d, 1); guard++; } }
 
-  function calCells(byDate, cycles, ovuDays, fertileDays) {
+  // 无排卵出血那几天（整段，不只勾上的那天）——日历上用空心格，跟真月经区分开
+  function breakthroughDays(byDate, cycles) {
+    const map = {};
+    cycles.forEach((cy) => (cy.breakthroughs || []).forEach((b) => {
+      for (let ds = b; Cycle.isPeriod(byDate[ds]); ds = D.addDays(ds, 1)) map[ds] = true;
+    }));
+    return map;
+  }
+
+  function calCells(byDate, cycles, ovuDays, fertileDays, brkDays) {
     const [y, m] = state.month.split('-').map(Number);
     const first = new Date(y, m - 1, 1);
     const lead = first.getDay();
@@ -1379,7 +1403,7 @@ window.Views = (function () {
       const cls = ['cal-cell'];
       if (ds === today) cls.push('today');
       if (ovuDays[ds]) cls.push('ovu');
-      else if (Cycle.isPeriod(rec)) cls.push('period');
+      else if (Cycle.isPeriod(rec)) cls.push(brkDays[ds] ? 'brk' : 'period');
       else if (fertileDays[ds]) cls.push('fertile');
 
       // 周期第几天
@@ -1413,7 +1437,14 @@ window.Views = (function () {
       <div>最近 ${s.recordedCycles} 个周期长度在 ${s.minCycle}–${s.maxCycle} 天之间波动较大，所以日历推算只能给个大概范围。
       更建议看“实时信号”——试纸强阳、蛋清拉丝、体温升高，而不是日历预测。</div></div>` : '';
 
-    return banner + `<div class="stat-grid" style="margin-bottom:14px">
+    // 中途掉过血时，说清楚天数为什么没从 1 重新数
+    const brkTip = s.currentBrk ? `<div class="verdict pending" style="margin-bottom:14px">
+      <div class="vtitle">这个周期中途掉过 ${s.currentBrk} 次血</div>
+      <div>那是「无排卵出血」——没排卵就没有黄体，不是真月经，所以<b>不另算一个新周期</b>。
+      天数仍从 ${s.currentStart.slice(5).replace('-', '月')}日那次真月经算起，现在是<b>第 ${s.currentCD} 天</b>，
+      也就是这一波已经拖了这么久还没排卵。</div></div>` : '';
+
+    return banner + brkTip + `<div class="stat-grid" style="margin-bottom:14px">
       <div class="stat"><div class="num" style="${s.irregular ? 'font-size:18px' : ''}">${cycleTxt}</div><div class="lbl">${cycleLbl}</div></div>
       <div class="stat"><div class="num">${cyc}</div><div class="lbl">当前周期第几天</div></div>
       <div class="stat"><div class="num" style="font-size:15px">${np}</div><div class="lbl">预测下次月经</div></div>
