@@ -85,8 +85,12 @@ window.Chart = (function () {
         svg += `<rect x="${rx0}" y="${padT}" width="${rx1 - rx0}" height="${plotH}" fill="${MED}" opacity="0.16"/>`;
         svg += `<line x1="${rx0}" y1="${padT}" x2="${rx0}" y2="${padT + plotH}" stroke="${MED}" stroke-width="1" opacity="0.5"/>`;
         svg += `<line x1="${rx1}" y1="${padT}" x2="${rx1}" y2="${padT + plotH}" stroke="${MED}" stroke-width="1" opacity="0.5"/>`;
-        if (r[1] - r[0] >= 2) {
-          svg += `<text x="${(rx0 + rx1) / 2}" y="${padT + plotH - 6}" font-size="10" fill="${MED}" text-anchor="middle" font-weight="600">用药·体温不作数</text>`;
+        // 标在绘图区顶部（易孕窗口/高温相那行的下面一行）。底部那行是「已完成」竖线的地盘，
+        // 两个标签挤在一起会叠字。窄的段放不下全称就只写「用药」，再窄就不写、看底色。
+        const w = rx1 - rx0;
+        const txt = w >= 100 ? '用药·体温不作数' : w >= 50 ? '用药' : '';
+        if (txt) {
+          svg += `<text x="${(rx0 + rx1) / 2}" y="${padT + 26}" font-size="10" fill="${MED}" text-anchor="middle" font-weight="600">${txt}</text>`;
         }
       });
     }

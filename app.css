@@ -337,6 +337,8 @@ body {
 .seg.mucus button.on { background: var(--green); }
 .seg.bool button.on { background: var(--pink); }
 .seg.stage button.on { background: var(--scan); }
+/* 少了这一条，选中的按钮就是白字白底——.seg button.on 只给了白字，底色得各自补 */
+.seg.med button.on { background: var(--scan); }
 
 textarea {
   width: 100%; border: 1.5px solid var(--line); border-radius: 12px;
@@ -381,12 +383,16 @@ textarea {
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
 /* ---------- 周期选择 ---------- */
-.cycle-switch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.cycle-switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.cycle-switch > .muted { flex: none; }
+/* 下拉框会被最长的那条选项撑宽，不封顶就会把整行顶出屏幕、逼着横向滑。
+   min-width:0 是关键：flex 子元素默认不肯缩到内容宽度以下。 */
 .cycle-switch select {
   border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 14px;
   background: #fff; color: var(--ink);
+  flex: 1; min-width: 0; max-width: 100%; text-overflow: ellipsis;
 }
-.cyc-nav { display: flex; align-items: center; gap: 8px; }
+.cyc-nav { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .cyc-arrow {
   border: 1.5px solid var(--line); background: #fff; color: var(--pink);
   width: 34px; height: 34px; border-radius: 10px; font-size: 20px; line-height: 1;

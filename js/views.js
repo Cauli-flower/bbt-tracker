@@ -382,7 +382,7 @@ window.Views = (function () {
         </div>
         <div class="field">
           <label>这个药会抬高基础体温吗 <span class="sub">影响排卵判读</span></label>
-          <div class="seg" id="me-affects">
+          <div class="seg med" id="me-affects">
             <button type="button" data-v="0" class="${m.affectsTemp ? '' : 'on'}">不会 / 不清楚</button>
             <button type="button" data-v="1" class="${m.affectsTemp ? 'on' : ''}">会抬高体温</button>
           </div>
@@ -1076,10 +1076,17 @@ window.Views = (function () {
     const cycle = cycles.find((x) => x.index === idx);
     const a = analyses[idx];
 
+    // 选项文字要短：下拉框宽度由最长那条决定，写全了在手机上一行放不下。
+    // 详情下面的判读卡里都有，这里只留认得出是哪个周期所需的最少信息。
     const options = cycles.map((cy) => {
       const nb = (cy.breakthroughs || []).length;
-      const conf = analyses[cy.index] && analyses[cy.index].tempConfounded ? '·用药影响' : '';
-      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.medStart ? '·药物重置' : ''}${conf}${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
+      const tags = [];
+      if (cy.medStart) tags.push('药重置');
+      if (analyses[cy.index] && analyses[cy.index].tempConfounded) tags.push('药影响');
+      if (cy.noPeriodStart) tags.push('起点缺');
+      if (nb) tags.push(`出血${nb}`);
+      if (cy.isOpen) tags.push('进行中');
+      const label = `周期${cy.index} · ${cy.start.slice(5).replace('-', '/')}起${tags.length ? ' · ' + tags.join('·') : ''}`;
       return `<option value="${cy.index}" ${cy.index === idx ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
