@@ -1,7 +1,7 @@
 /*
  * app.js — 入口：底部标签切换、初始化、注册 Service Worker
  */
-window.APP_VERSION = 'v15';  // 与 service-worker 缓存版本同步，显示在设置页便于确认更新
+window.APP_VERSION = 'v16';  // 与 service-worker 缓存版本同步，显示在设置页便于确认更新
 (function () {
   const views = { record: Views.record, chart: Views.chart, calendar: Views.calendar, settings: Views.settings };
   let current = 'record';

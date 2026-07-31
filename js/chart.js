@@ -8,6 +8,7 @@ window.Chart = (function () {
   const D = window.DateU;
   const TMIN = 35.5, TMAX = 37.5;
   const SCAN = '#7d6f96';   // 灰紫：监测数据（与 app.css 的 --scan 一致）
+  const MED = '#9b8fb5';    // 淡紫：体温受用药影响、不作数的那几天
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
@@ -69,6 +70,27 @@ window.Chart = (function () {
       }
     }
 
+    // —— 用药期底色（体温被药托高、不作数的那几天）——
+    // 连续的日子并成一段画，中间断开就分成几段，一眼看出「哪一截曲线不能信」
+    const offCDs = (cycle.confounded || []).map((ds) => D.diffDays(start, ds) + 1)
+      .filter((cd) => cd >= 1 && cd <= maxCD).sort((p, q) => p - q);
+    if (offCDs.length) {
+      const runs = [];
+      offCDs.forEach((cd) => {
+        const last = runs[runs.length - 1];
+        if (last && cd === last[1] + 1) last[1] = cd; else runs.push([cd, cd]);
+      });
+      runs.forEach((r) => {
+        const rx0 = x(r[0]) - col / 2, rx1 = x(r[1]) + col / 2;
+        svg += `<rect x="${rx0}" y="${padT}" width="${rx1 - rx0}" height="${plotH}" fill="${MED}" opacity="0.16"/>`;
+        svg += `<line x1="${rx0}" y1="${padT}" x2="${rx0}" y2="${padT + plotH}" stroke="${MED}" stroke-width="1" opacity="0.5"/>`;
+        svg += `<line x1="${rx1}" y1="${padT}" x2="${rx1}" y2="${padT + plotH}" stroke="${MED}" stroke-width="1" opacity="0.5"/>`;
+        if (r[1] - r[0] >= 2) {
+          svg += `<text x="${(rx0 + rx1) / 2}" y="${padT + plotH - 6}" font-size="10" fill="${MED}" text-anchor="middle" font-weight="600">用药·体温不作数</text>`;
+        }
+      });
+    }
+
     // —— 横向网格线 + 温度标签 ——
     for (let t = 36.0; t <= 37.0 + 1e-6; t += 0.5) {
       const yy = y(t);
@@ -92,7 +114,10 @@ window.Chart = (function () {
       svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#ad8a86" stroke-width="1.5" stroke-dasharray="5 4"/>`;
       svg += `<text x="${W - padR}" y="${yy - 5}" font-size="10" fill="#ad8a86" text-anchor="end">覆盖线 ${a.coverline.toFixed(2)}</text>`;
     } else {
-      const tp = a.tempPoints || [];
+      // 基线只用「不受用药影响」的点，否则药抬上去的那几天会把基线一起拽高
+      const all = a.tempPoints || [];
+      const cleanTp = all.filter((p) => !p.off);
+      const tp = cleanTp.length >= 3 ? cleanTp : all;
       if (tp.length >= 3) {
         // 基线锚定在「低温相」：取最低的若干天求平均，不把高温相算进去，
         // 这样基线不会随升温往上漂，高温区始终清楚（类似 Apple Watch 固定基线 / BBT 覆盖线的思路）
@@ -123,13 +148,20 @@ window.Chart = (function () {
     }
 
     // —— 体温折线 + 点 ——
+    // 受用药影响的那几天单独画成淡紫虚线、空心点，跟能信的那截明确分开
     const pts = a.tempPoints || [];
     if (pts.length) {
-      let dpath = '';
-      pts.forEach((p, i) => { dpath += (i ? ' L' : 'M') + x(p.cd) + ' ' + y(p.temp); });
-      svg += `<path d="${dpath}" fill="none" stroke="#ad8a86" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i];
+        const dim = p0.off || p1.off;
+        svg += `<line x1="${x(p0.cd)}" y1="${y(p0.temp)}" x2="${x(p1.cd)}" y2="${y(p1.temp)}" ` +
+          `stroke="${dim ? MED : '#ad8a86'}" stroke-width="2.5" stroke-linecap="round"` +
+          `${dim ? ' stroke-dasharray="4 3" opacity="0.75"' : ''}/>`;
+      }
       pts.forEach((p) => {
-        svg += `<circle cx="${x(p.cd)}" cy="${y(p.temp)}" r="3.5" fill="#fff" stroke="#ad8a86" stroke-width="2"/>`;
+        svg += p.off
+          ? `<circle cx="${x(p.cd)}" cy="${y(p.temp)}" r="3.5" fill="#fff" stroke="${MED}" stroke-width="2" stroke-dasharray="2 1.6"/>`
+          : `<circle cx="${x(p.cd)}" cy="${y(p.temp)}" r="3.5" fill="#fff" stroke="#ad8a86" stroke-width="2"/>`;
       });
     }
 
@@ -218,6 +250,8 @@ window.Chart = (function () {
       <span><b style="color:${SCAN}">11</b> 监测尺寸 mm·左右各一行(左/右)</span>
       <span style="color:${SCAN}">— — 监测标为「已完成」那天</span>
       <span style="width:100%;color:#bbb">左右分开看：两边常各有一个、迟迟分不出大小，就看哪边先跑出来</span>
+      <span><i class="dot" style="background:${MED}"></i>淡紫底色＝用药期，体温不作数</span>
+      <span style="width:100%;color:#bbb">淡紫虚线那截是被药托高的体温：不参与覆盖线、也不能当排卵证据，这个周期不下排卵结论</span>
       <span><i class="dot" style="background:#c79a5a"></i>当天有备注(备)</span>
       <span style="width:100%;color:#bbb">👆点曲线上某一天，可看当天体温、测量时间和备注全文</span>
       <span style="width:100%;color:#bbb">基线＝你低温相的水平(不随高温漂移)；体温明显升到基线上方、且连续几天＝可能已排卵升温</span>

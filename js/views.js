@@ -248,6 +248,7 @@ window.Views = (function () {
           <span class="med-day">${status}</span>
         </div>
         <div class="med-meta">${meta}</div>
+        ${m.affectsTemp ? '<div class="med-meta" style="color:#7d6f96">💊 会抬高体温 · 这几天的体温不参与排卵判读</div>' : ''}
         ${bar}
         ${covers ? doseBlockHTML(m, date) : ''}
         ${(!covers && cls === 'done' && doseStats(m)) ? `<div class="med-stat">${doseStats(m)}</div>` : ''}
@@ -345,7 +346,7 @@ window.Views = (function () {
   /* 新增 / 编辑一个疗程；med=null 就是新增 */
   function openMedEditor(med, viewDate, onDone) {
     const isNew = !med;
-    const m = Object.assign({ id: medId(), name: '', start: D.todayStr(), end: '', days: null, perDay: 2, taken: {}, note: '' }, med || {});
+    const m = Object.assign({ id: medId(), name: '', start: D.todayStr(), end: '', days: null, perDay: 2, taken: {}, affectsTemp: false, note: '' }, med || {});
     m.perDay = dosePer(m);
     m.taken = m.taken || {};
     const overlay = document.createElement('div');
@@ -380,6 +381,18 @@ window.Views = (function () {
           <input type="number" id="me-days" class="med-input" min="1" max="180" value="${m.days || ''}" placeholder="例：10">
         </div>
         <div class="field">
+          <label>这个药会抬高基础体温吗 <span class="sub">影响排卵判读</span></label>
+          <div class="seg" id="me-affects">
+            <button type="button" data-v="0" class="${m.affectsTemp ? '' : 'on'}">不会 / 不清楚</button>
+            <button type="button" data-v="1" class="${m.affectsTemp ? 'on' : ''}">会抬高体温</button>
+          </div>
+          <div class="sub" style="margin-top:8px">
+            孕激素类（黄体酮、地屈孕酮、达芙通等）常会把体温整体托高，那段升温看着跟排卵后一模一样。
+            选「会」之后，用药期间（含停药后 ${Cycle.TEMP_TAIL} 天）的体温会标成<b>不作数</b>，
+            这个周期不给排卵结论，也不进长期统计——宁可这个周期空着，也别把药的体温当成排卵。
+          </div>
+        </div>
+        <div class="field">
           <label>结束日期 <span class="sub">还在吃就留空</span></label>
           <button type="button" class="date-field" id="me-end">
             <span class="date-field-text" id="me-end-t">${m.end ? D.human(m.end) : '还在吃'}</span>
@@ -408,6 +421,14 @@ window.Views = (function () {
       perBox.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
       m.perDay = parseInt(b.dataset.n, 10);
+    });
+
+    const affBox = overlay.querySelector('#me-affects');
+    affBox.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]'); if (!b) return;
+      affBox.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      m.affectsTemp = b.dataset.v === '1';
     });
 
     overlay.querySelector('#me-start').addEventListener('click', () => {
@@ -994,7 +1015,7 @@ window.Views = (function () {
 
   async function updateSub() {
     const days = await Store.allDays();
-    const cycles = Cycle.buildCycles(days);
+    const cycles = Cycle.buildCycles(days, Store.getMeds());
     const open = cycles.find((c) => c.isOpen && !c.noPeriodStart);
     if (open) {
       const cd = D.diffDays(open.start, state.date) + 1;
@@ -1005,13 +1026,13 @@ window.Views = (function () {
   /* ==================================================================
    *  曲线页
    * ================================================================== */
-  const SHAPE = { biphasic: '双相', weak: '升温偏弱', waiting: '进行中', anovulatory: '未见排卵', pending: '待定' };
-  const VCLASS = { biphasic: 'biphasic', weak: 'mono', anovulatory: 'mono', waiting: 'pending', pending: 'pending' };
+  const SHAPE = { biphasic: '双相', weak: '升温偏弱', waiting: '进行中', anovulatory: '未见排卵', confounded: '用药影响', pending: '待定' };
+  const VCLASS = { biphasic: 'biphasic', weak: 'mono', anovulatory: 'mono', waiting: 'pending', confounded: 'pending', pending: 'pending' };
 
   async function chart() {
     $title().textContent = '体温曲线'; $sub().textContent = '';
     const days = await Store.allDays();
-    const cycles = Cycle.buildCycles(days);
+    const cycles = Cycle.buildCycles(days, Store.getMeds());
     const c = $app();
 
     if (!cycles.length || days.filter((d) => d.temp != null).length === 0) {
@@ -1057,15 +1078,19 @@ window.Views = (function () {
 
     const options = cycles.map((cy) => {
       const nb = (cy.breakthroughs || []).length;
-      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.medStart ? '·药物重置' : ''}${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
+      const conf = analyses[cy.index] && analyses[cy.index].tempConfounded ? '·用药影响' : '';
+      const label = `周期 ${cy.index}（${cy.start.slice(5)} 起${cy.medStart ? '·药物重置' : ''}${conf}${cy.isOpen ? '·进行中' : ''}${cy.noPeriodStart ? '·起点未记录' : ''}${nb ? `·含${nb}次中途出血` : ''}）`;
       return `<option value="${cy.index}" ${cy.index === idx ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
     const vClass = VCLASS[a.state] || 'pending';
-    const ovuTxt = a.ovulationConfirmed ? `${D.human(a.ovulationDate).replace(/ 周.$/, '')}（第${a.ovuCD}天）` : '未确认';
+    const ovuTxt = a.ovulationConfirmed ? `${D.human(a.ovulationDate).replace(/ 周.$/, '')}（第${a.ovuCD}天）`
+      : a.tempConfounded ? '不判读' : '未确认';
     const lutealTxt = a.lutealLength != null ? `${a.lutealLength} 天` : '—';
     const cdays = cycle.days.length ? D.diffDays(cycle.start, cycle.days[cycle.days.length - 1].date) + 1 : 0;
-    const confirmBadge = a.ovulationConfirmed
+    const confirmBadge = a.tempConfounded
+      ? '<span class="pill" style="background:#e4dfec;color:#6f6288">体温受用药影响</span>'
+      : a.ovulationConfirmed
       ? '<span class="pill" style="background:#dde3e2;color:#586d70">体温已确认</span>'
       : (a.lhHint ? '<span class="pill">试纸预测·待体温确认</span>' : '');
 
@@ -1085,6 +1110,7 @@ window.Views = (function () {
         ${a.lhHint ? `<div style="margin-top:8px">🔎 ${a.lhHint}</div>` : ''}
         ${a.lhSurge ? `<div style="margin-top:8px">📈 试纸在 ${D.human(a.lhSurge.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[a.lhSurge.from]}→${LH_L[a.lhSurge.to]}），LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${a.lhSurge.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>` : ''}
         ${a.lhCaveat ? `<div style="margin-top:8px;color:#877049">⚠️ ${a.lhCaveat}</div>` : ''}
+        ${a.confoundedNote ? `<div style="margin-top:8px">💊 ${a.confoundedNote}</div>` : ''}
         ${a.medStartNote ? `<div style="margin-top:8px">💊 ${a.medStartNote}</div>` : ''}
         ${a.breakthroughNote ? `<div style="margin-top:8px">🩸 ${a.breakthroughNote}</div>` : ''}
         ${a.shortLuteal ? `<div style="margin-top:8px;color:#877049">⚠️ 黄体期偏短（<10 天），若多个周期如此可咨询医生。</div>` : ''}
@@ -1261,6 +1287,7 @@ window.Views = (function () {
       let status = 'pending';
       if (a.ovulationConfirmed) status = 'ovulatory';
       else if (a.classification === 'anovulatory') status = 'anovulatory';
+      else if (a.tempConfounded) status = 'confounded';
       return {
         index: cy.index, start: cy.start, length: Math.max(1, length),
         isOpen: cy.isOpen, status, ovuCD: a.ovuCD, medStart: !!cy.medStart,
@@ -1274,11 +1301,13 @@ window.Views = (function () {
     const COLOR = {
       ovulatory: { base: '#c2d0b0', dark: '#94a87f', txt: '#6f8159' },
       anovulatory: { base: '#dcc18f', dark: '#dcc18f', txt: '#a9803f' },
+      confounded: { base: '#cdc3dc', dark: '#cdc3dc', txt: '#7d6f96' },
       pending: { base: '#d6d0d3', dark: '#d6d0d3', txt: '#999' },
     };
     const statLabel = (r) => {
       if (r.status === 'ovulatory') return `排卵<br>第${r.ovuCD}天`;
       if (r.status === 'anovulatory') return '未见<br>排卵';
+      if (r.status === 'confounded') return '用药<br>不判读';
       return r.isOpen ? '进行中' : '数据<br>不足';
     };
 
@@ -1308,6 +1337,7 @@ window.Views = (function () {
     // 趋势小结（借用既有统计：是否规律 / 长度范围）
     const stats = Cycle.cycleStats(cycles, Store.getSettings());
     const ovuN = rows.filter((r) => r.status === 'ovulatory').length;
+    const confN = rows.filter((r) => r.status === 'confounded').length;
     const brkN = rows.reduce((s, r) => s + r.brkCDs.length, 0);
     let summary;
     if (stats.recordedCycles < 2) {
@@ -1324,12 +1354,14 @@ window.Views = (function () {
         <div>每行是一个周期（上＝早，下＝近）。<b>横条越长＝周期越长；绿＝已确认排卵，黄＝未见排卵，灰＝进行中/数据不足；深色竖线＝排卵日。</b></div>
         <div style="margin-top:8px">${summary}</div>
         ${brkN ? `<div style="margin-top:8px">🩸 横条上的<b>浅色断口</b>是中途的「无排卵出血」。没排卵就没有黄体，那不是真月经，所以<b>不另算一个周期</b>——它只在原来的周期里留个记号，天数一直往下数。</div>` : ''}
+        ${confN ? `<div style="margin-top:8px">💊 紫色的 ${confN} 条是<b>体温受用药影响</b>的周期。药把体温托高的那一段跟排卵后升温长得一样，认不出真假，所以这些周期<b>既不算排卵、也不算没排卵</b>，直接从统计里摘出去——不然一个假台阶会把后面几个周期的预测一起带偏。</div>` : ''}
       </div>
       <div class="card">
         ${rows.length ? rowsHTML : '<div class="empty-tip">还没有周期数据。</div>'}
         <div class="legend" style="margin-top:14px">
           <span><i class="dot" style="background:#94a87f"></i>已确认排卵</span>
           <span><i class="dot" style="background:#dcc18f"></i>未见排卵</span>
+          <span><i class="dot" style="background:#cdc3dc"></i>用药影响·不判读</span>
           <span><i class="dot" style="background:#d6d0d3"></i>进行中/不足</span>
           <span>｜ 深色竖线＝排卵日</span>
           <span><i class="dot" style="background:#c08b84"></i>浅色断口＝无排卵出血(不另算周期)</span>
@@ -1345,7 +1377,7 @@ window.Views = (function () {
     $title().textContent = '周期日历'; $sub().textContent = '';
     const days = await Store.allDays();
     const byDate = {}; days.forEach((d) => { byDate[d.date] = d; });
-    const cycles = Cycle.buildCycles(days);
+    const cycles = Cycle.buildCycles(days, Store.getMeds());
     const settings = Store.getSettings();
     const stats = Cycle.cycleStats(cycles, settings);
 
@@ -1480,7 +1512,7 @@ window.Views = (function () {
   }
 
   function overviewCard(o, stats) {
-    if (!o.total) return '';   // 还没有完整周期
+    if (!o.total && !o.confounded) return '';   // 还没有完整周期
     const doctor = o.suggestSeeDoctor ? `<div style="margin-top:10px;color:#877049">⚠️ ${
       o.recentAnovStreak >= 2 ? '最近连续多个周期未见排卵' : '当前周期已偏长'
     }，建议就诊生殖科 / 内分泌科做进一步检查（B 超、激素等）。仅作提醒，不代表诊断。</div>` : '';
@@ -1492,6 +1524,7 @@ window.Views = (function () {
         <div class="stat"><div class="num" style="color:#aaa">${o.unknown}</div><div class="lbl">数据不足</div></div>
         <div class="stat"><div class="num" style="color:#a98a5f">${o.shortLuteal}</div><div class="lbl">黄体期偏短</div></div>
       </div>
+      ${o.confounded ? `<div style="margin-top:10px;color:#7d6f96">💊 另有 <b>${o.confounded}</b> 个周期因用药抬高体温，判读不可靠，<b>没有计入上面的统计</b>（既不算排卵、也不算未排卵）。这些周期要确认排没排，得靠复查或激素。</div>` : ''}
       ${doctor}
     </div>`;
   }
