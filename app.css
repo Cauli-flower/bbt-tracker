@@ -265,6 +265,28 @@ body {
 }
 .med-mini:active { background: var(--pink-bg); }
 .med-mini.danger { color: #b07a6e; border-color: #ecdcd6; }
+/* 计划天数到了 / 超了的提醒，以及被它点亮的「结束疗程」 */
+.med-hint {
+  margin-top: 9px; padding: 8px 10px; border-radius: 10px;
+  background: #fdf4e8; border: 1px solid #ecd9bd;
+  font-size: 12.5px; line-height: 1.6; color: #7d6a4d;
+}
+.med-hint b { color: #8a6d3f; }
+.med-mini.go { background: var(--amber); border-color: var(--amber); color: #fff; }
+/* 结束疗程：选「最后一次吃药是哪天」 */
+.stop-tip { font-size: 13px; line-height: 1.6; color: var(--ink-soft); margin-bottom: 12px; }
+.stop-tip b { color: var(--ink); }
+.stop-opts { display: flex; flex-direction: column; gap: 8px; }
+.stop-opt {
+  width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 12px; padding: 11px 13px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.stop-opt:active { background: var(--pink-bg); }
+.stop-opt .so-t { font-size: 15px; font-weight: 600; }
+.stop-opt .so-s { font-size: 12.5px; color: var(--ink-soft); }
+.stop-opt:first-child { border-color: var(--amber); background: #fdf4e8; }
 /* 疗程编辑弹窗 */
 .med-edit { max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .med-edit .field { margin-bottom: 14px; }

@@ -134,8 +134,15 @@ window.Views = (function () {
   function medCovers(m, date) { return m.start <= date && (!m.end || m.end >= date); }
   function medDayNo(m, date) { return D.diffDays(m.start, date) + 1; }
   const md = (s) => s.slice(5).replace('-', '/');   // 2026-07-28 → 07/28
-  // 计划结束日：开始日 + 天数 - 1
+  // 计划结束日：开始日 + 天数 - 1（第 1 天就是开始日，所以减 1）
   function medPlanEnd(m) { return m.days ? D.addDays(m.start, m.days - 1) : ''; }
+  /* 计划吃完了没有（只对「还没填结束日期」的疗程有意义）：
+     'last' = 今天正好是计划的最后一天，'over' = 已经过了计划的最后一天。 */
+  function medPlanState(m, today) {
+    const pe = medPlanEnd(m);
+    if (!pe || m.end) return '';
+    return today === pe ? 'last' : today > pe ? 'over' : '';
+  }
 
   // 一天吃几次 → 每次叫什么
   const DOSE_L = { 1: ['今天'], 2: ['早', '晚'], 3: ['早', '中', '晚'], 4: ['①', '②', '③', '④'] };
@@ -241,6 +248,19 @@ window.Views = (function () {
       const pct = Math.max(0, Math.min(100, Math.round(n / m.days * 100)));
       bar = `<div class="med-bar"><i style="width:${pct}%"></i></div>`;
     }
+
+    /* 计划天数到了要提醒一声：第 N 天当天就能收尾，
+       晚一天再点也不会把天数多算——弹层里有「按计划吃完」。 */
+    const today = D.todayStr();
+    const ps = medPlanState(m, today);
+    let hint = '';
+    if (ps === 'last') {
+      hint = `<div class="med-hint">今天是计划的第 ${m.days} 天，也是最后一天。今天的药吃完就可以点下面的「吃完了，结束疗程」，记的就是 ${m.days} 天。</div>`;
+    } else if (ps === 'over') {
+      const over = D.diffDays(planEnd, today);
+      hint = `<div class="med-hint">计划的 ${m.days} 天在 ${md(planEnd)} 就吃满了（到今天多算了 ${over} 天）。如果那天就停了，点「结束这个疗程」选<b>按计划吃完</b>，天数不会错位。</div>`;
+    }
+    const stopLabel = ps === 'last' ? `吃完了，结束疗程（共 ${m.days} 天）` : '结束这个疗程';
     return `
       <div class="med-item ${cls}" data-id="${m.id}">
         <div class="med-top">
@@ -250,12 +270,13 @@ window.Views = (function () {
         <div class="med-meta">${meta}</div>
         ${m.affectsTemp ? '<div class="med-meta" style="color:#7d6f96">💊 会抬高体温 · 这几天的体温不参与排卵判读</div>' : ''}
         ${bar}
+        ${hint}
         ${covers ? doseBlockHTML(m, date) : ''}
         ${(!covers && cls === 'done' && doseStats(m)) ? `<div class="med-stat">${doseStats(m)}</div>` : ''}
         ${(m.note || '').trim() ? `<div class="med-note">${esc(m.note)}</div>` : ''}
         <div class="med-acts">
           <button type="button" class="med-mini" data-act="edit">编辑</button>
-          ${(!m.end && m.start <= D.todayStr()) ? '<button type="button" class="med-mini" data-act="stop">结束这个疗程</button>' : ''}
+          ${(!m.end && m.start <= today) ? `<button type="button" class="med-mini${ps ? ' go' : ''}" data-act="stop">${stopLabel}</button>` : ''}
         </div>
       </div>`;
   }
@@ -330,17 +351,77 @@ window.Views = (function () {
           saveCur(true).then(() => { state.date = ds; record(); });
 
         } else if (act === 'stop') {
-          const today = D.todayStr();
-          if (today < m.start) { toast('这个疗程还没开始'); return; }
-          const list = Store.getMeds();
-          const t = list.find((x) => x.id === m.id);
-          t.end = today;
-          Store.saveMeds(list);
-          renderMedBox(date);
-          toast(`已记：吃到今天，共 ${D.diffDays(t.start, today) + 1} 天 ✓`);
+          if (D.todayStr() < m.start) { toast('这个疗程还没开始'); return; }
+          openMedStopSheet(m, () => renderMedBox(date));
         }
       });
     });
+  }
+
+  /* 结束疗程：先问「最后一次吃药是哪天」。
+     以前是二话不说记成今天——第 10 天当天忘了点，第 11 天再点就变成 11 天，
+     用药天数整个错位一天。现在把「按计划吃完 / 今天 / 昨天 / 挑一天」摆出来选。 */
+  function openMedStopSheet(m, onDone) {
+    const today = D.todayStr();
+    const planEnd = medPlanEnd(m);
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+
+    const daysOf = (d) => D.diffDays(m.start, d) + 1;
+    const opts = [];
+    const push = (d, title, sub) => {
+      if (d < m.start || d > today || opts.some((o) => o.d === d)) return;
+      opts.push({ d, title, sub: sub || `${md(d)} · 共 ${daysOf(d)} 天` });
+    };
+    // 按计划吃完排最前：计划天数到了却晚点了几天才来收尾，这条就是那颗后悔药
+    if (planEnd && planEnd <= today) push(planEnd, `按计划吃完（${m.days} 天）`);
+    push(today, '吃到今天');
+    push(D.addDays(today, -1), '吃到昨天');
+
+    overlay.innerHTML = `
+      <div class="dp-card med-edit">
+        <div class="np-title">结束这个疗程</div>
+        <div class="stop-tip">最后一次吃药是哪天？<b>那天也算在疗程里</b>。</div>
+        <div class="stop-opts">
+          ${opts.map((o) => `
+            <button type="button" class="stop-opt" data-d="${o.d}">
+              <span class="so-t">${o.title}</span>
+              <span class="so-s">${o.sub}</span>
+            </button>`).join('')}
+          <button type="button" class="stop-opt" data-pick="1">
+            <span class="so-t">挑一天…</span>
+            <span class="so-s">从日历里选最后一天</span>
+          </button>
+        </div>
+        <div class="np-actions"><button class="np-cancel" id="ms-cancel">取消</button></div>
+      </div>`;
+
+    overlay.querySelector('.dp-card').addEventListener('click', (e) => e.stopPropagation());
+    overlay.addEventListener('click', close);
+    overlay.querySelector('#ms-cancel').addEventListener('click', close);
+
+    function apply(end) {
+      const list = Store.getMeds();
+      const t = list.find((x) => x.id === m.id);
+      if (!t) return;
+      t.end = end;
+      Store.saveMeds(list);
+      close(); onDone();
+      toast(`已记：吃到 ${md(end)}，共 ${daysOf(end)} 天 ✓`);
+    }
+
+    overlay.querySelectorAll('.stop-opt').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.pick) {
+        openDatePicker(planEnd && planEnd <= today ? planEnd : today, today, (picked) => {
+          if (picked < m.start) { toast('比开始日期还早'); return; }
+          apply(picked);
+        });
+      } else {
+        apply(b.dataset.d);
+      }
+    }));
   }
 
   /* 新增 / 编辑一个疗程；med=null 就是新增 */
