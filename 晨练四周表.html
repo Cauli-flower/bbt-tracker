@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#4a6fa5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="晨练四周表">
+<title>晨练四周表</title>
+<style>
+  :root{
+    --bg:#f2f5fa; --card:#fff; --ink:#26303d; --soft:#68758a;
+    --accent:#4a6fa5; --accent-soft:#e7edf6; --line:#e6ebf3;
+    --w1:#b3c2d8; --w2:#8ba4c6; --w3:#6787b4; --w4:#4a6fa5;
+    --spec:#b5713f; --spec-soft:#f7ece1;
+    --done:#5fa38a;
+    --moon:#96688c; --moon-soft:#f3ebf2;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;padding:18px 14px 48px;max-width:580px;margin:0 auto}
+  header{text-align:center;margin:6px 0 16px}
+  header h1{font-size:21px;margin:0 0 4px;font-weight:700}
+  header p{margin:0;color:var(--soft);font-size:13px}
+  .card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 14px rgba(60,90,140,.06)}
+  .card>h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;font-weight:700}
+  .card>h2 small{margin-left:auto;font-weight:400;color:var(--soft);font-size:12px}
+  .emoji{font-size:19px}
+
+  /* 进度 */
+  .prog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+  .prog-n{font-size:13px;color:var(--soft)}
+  .prog-n b{font-size:20px;color:var(--accent);font-weight:700}
+  .bar{height:7px;background:var(--accent-soft);border-radius:20px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:20px;transition:width .3s}
+  .prog-tip{font-size:12px;color:var(--soft);margin-top:9px}
+  .reset{background:none;border:none;color:var(--soft);font-size:12px;text-decoration:underline;padding:0;cursor:pointer;font-family:inherit}
+
+  /* 天 */
+  .week{display:flex;flex-direction:column;gap:8px}
+  .day{display:flex;align-items:stretch;border-radius:12px;overflow:hidden;border:1px solid var(--line);transition:opacity .2s}
+  .day .d-name{flex-shrink:0;width:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#fff;line-height:1.2;padding:6px 0}
+  .day .d-name .dn{font-weight:700;font-size:13px}
+  .day .d-name .dd{font-size:10.5px;opacity:.85}
+  .day .d-body{flex:1;padding:9px 11px;background:#fff;min-width:0}
+  .day .d-type{font-weight:700;font-size:14px}
+  .day .d-detail{font-size:12px;color:var(--soft);margin-top:2px}
+  .day .d-note{font-size:12px;margin-top:5px;padding-top:5px;border-top:1px dashed var(--line);color:var(--soft)}
+  .day .d-note b{color:var(--ink)}
+  .day .vid{display:inline-block;margin-top:6px;margin-right:6px;font-size:12px;color:#fff;font-weight:600;
+    text-decoration:none;background:var(--accent);padding:3px 11px;border-radius:20px}
+  .day .vid.alt{background:#fff;color:var(--accent);border:1.5px solid var(--accent-soft)}
+  .day .vid.sub{background:#fff;color:var(--soft);border:1.5px solid var(--line);font-weight:500}
+  .w1 .d-name{background:var(--w1)} .w2 .d-name{background:var(--w2)}
+  .w3 .d-name{background:var(--w3)} .w4 .d-name{background:var(--w4)}
+  .tag{font-size:11px;color:#fff;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:1px;background:var(--spec)}
+  .tag.new{background:var(--w3)}
+
+  /* 打卡 */
+  .chk{flex-shrink:0;width:40px;display:flex;align-items:center;justify-content:center;background:#fff;
+    border-right:1px solid var(--line);cursor:pointer}
+  .chk .box{width:21px;height:21px;border:1.5px solid #cfd8e6;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;transition:.15s}
+  .day.done .chk .box{background:var(--done);border-color:var(--done)}
+  .day.done{opacity:.55}
+  .day.done .d-type{text-decoration:line-through}
+
+  .focus{background:var(--accent-soft);border-radius:12px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+  .focus b{color:var(--accent)}
+  .focus.moon{background:var(--moon-soft)} .focus.moon b{color:var(--moon)}
+
+  /* 经期可选 */
+  .mday{padding:11px 0;border-top:1px solid var(--line)}
+  .mday:first-of-type{border-top:none;padding-top:2px}
+  .mday .t{font-weight:700;font-size:13.5px;color:var(--moon)}
+  .mday .c{font-size:13px;margin-top:3px;color:var(--soft)}
+  .mday .vid{display:inline-block;margin-top:7px;margin-right:6px;font-size:12px;color:#fff;font-weight:600;
+    text-decoration:none;background:var(--moon);padding:3px 11px;border-radius:20px}
+  .mday .vid.alt{background:#fff;color:var(--moon);border:1.5px solid var(--moon-soft)}
+  .yn{display:flex;gap:10px;margin-top:4px}
+  .yn .col{flex:1;border-radius:12px;padding:10px 12px}
+  .yn .col.y{background:#eef6f0} .yn .col.n{background:#f9edea}
+  .yn .col h3{margin:0 0 6px;font-size:12.5px;font-weight:700}
+  .yn .col.y h3{color:#5fa37e} .yn .col.n h3{color:#c17a6a}
+  .yn .col ul{margin:0;padding-left:16px} .yn .col li{font-size:12.5px;margin:3px 0}
+
+  ul.tips{margin:4px 0;padding-left:20px}
+  ul.tips li{margin:6px 0;font-size:13.5px}
+  .kit{display:flex;justify-content:space-between;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
+  .kit:first-of-type{border-top:none}
+  .kit span:last-child{color:var(--soft);font-size:12.5px;flex-shrink:0;padding-left:10px}
+  .leg{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .leg:first-of-type{border-top:none}
+  .leg .n{flex-shrink:0;width:22px;height:22px;line-height:22px;text-align:center;background:var(--accent);
+    color:#fff;border-radius:50%;font-size:12px;font-weight:700}
+  .leg.now .n{background:var(--spec)}
+  .leg b{font-weight:700}
+  .leg .when{color:var(--soft);font-size:12px}
+  .mantra{background:linear-gradient(135deg,#4a6fa5,#6f93c4);color:#fff;text-align:center;border-radius:18px;
+    padding:16px;font-size:14.5px;font-weight:600;line-height:1.7;box-shadow:0 4px 16px rgba(74,111,165,.28)}
+  .foot{text-align:center;color:var(--soft);font-size:12px;margin-top:16px;line-height:1.7}
+  .foot a{color:var(--soft)}
+  small{color:var(--soft)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗓️ 晨练四周表</h1>
+  <p>第一阶段 · 打基础 · 8/18 – 9/11 共 15 次</p>
+</header>
+
+<!-- 进度 -->
+<div class="card">
+  <h2><span class="emoji">📊</span>本阶段进度</h2>
+  <div class="prog-top">
+    <div class="prog-n"><b id="doneN">0</b> / 15 次</div>
+    <button class="reset" id="reset">清空重来</button>
+  </div>
+  <div class="bar"><i id="fill"></i></div>
+  <div class="prog-tip">练完点一下左边的圈。记录只存在本机，换手机不会同步。</div>
+</div>
+
+<!-- 这四周在干什么 -->
+<div class="card">
+  <h2><span class="emoji">🎯</span>这四周的目标</h2>
+  <div class="focus"><b>不追重量、不追出汗。</b>只有两件事：把动作学对，把习惯立住。</div>
+  <ul class="tips">
+    <li><b>跟不上就按暂停</b>，补完再继续。<b>姿势永远优先于跟上节奏</b>——为了跟上而变形，等于白练。</li>
+    <li><b>每次记下用了几公斤、做了几次。</b>两个月后翻回来看 3kg 变成 5kg，这个反馈比镜子和秤都快。</li>
+    <li><b>经期停晨练，整张表往后顺延</b>——是推迟不是跳过，日期自己往后挪。散步照常。</li>
+    <li><b>周日晚上花 3 分钟</b>把下周四个视频加进一个收藏夹，早上不用做任何决定。</li>
+  </ul>
+</div>
+
+<!-- 第一周 -->
+<div class="card">
+  <h2><span class="emoji">1️⃣</span>第一周 <small>8/18 – 8/21 · 3 次</small></h2>
+  <div class="focus"><b>不上重量。</b>唯一任务是把每节完整做完。</div>
+  <div class="week">
+
+    <div class="day w1" data-id="d1">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">二</span><span class="dd">8/18</span></div>
+      <div class="d-body">
+        <div class="d-type">上肢 + 薄背</div>
+        <div class="d-detail">站立芭杆 20 分钟｜练手臂后侧和上背线条</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV11Autz4EoV/" target="_blank" rel="noopener">▶ 手臂×薄背 20′</a>
+        <a class="vid sub" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">+ YTWL 10′</a>
+        <div class="d-note">第一次练，强度选最低档。<b>做不完就停，不算失败。</b></div>
+      </div>
+    </div>
+
+    <div class="day w1" data-id="d2">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">四</span><span class="dd">8/20</span></div>
+      <div class="d-body">
+        <div class="d-type">臀腿</div>
+        <div class="d-detail">全程站立、无跳跃，30 分钟</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1FczFBcEBQ/" target="_blank" rel="noopener">▶ 臀腿雕刻 30′</a>
+        <div class="d-note">臀部找不到发力感很正常，先跟着口令走。</div>
+      </div>
+    </div>
+
+    <div class="day w1" data-id="d3">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">五</span><span class="dd">8/21</span></div>
+      <div class="d-body">
+        <div class="d-type">上肢 + 薄背</div>
+        <div class="d-detail">加长版 30 分钟，本周最难的一节</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1qQc4zxEsi/" target="_blank" rel="noopener">▶ 上肢雕刻 30′</a>
+        <a class="vid sub" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">+ YTWL 10′</a>
+      </div>
+    </div>
+
+  </div>
+  <div class="d-note" style="margin-top:12px;padding-top:9px;border-top:1px solid var(--line)">
+    <b>本周训练之外两件事：</b>① 下单器材（哑铃 3kg、5kg 各一对 + 弹力带 + 垫子），第二周要用；
+    ② 晚上散步回来看完动作讲解——
+    <a href="https://www.bilibili.com/video/BV1FY4y1y7Vh/" target="_blank" rel="noopener">卓叔·哑铃动作教学</a>、
+    <a href="https://www.bilibili.com/video/BV127411i78s/" target="_blank" rel="noopener">哑铃 25 个动作详解</a>。
+  </div>
+</div>
+
+<!-- 第二周 -->
+<div class="card">
+  <h2><span class="emoji">2️⃣</span>第二周 <small>8/24 – 8/28 · 4 次</small></h2>
+  <div class="focus"><b>哑铃进场，3kg。</b>第一次负重跟练排在周五。</div>
+  <div class="week">
+
+    <div class="day w2" data-id="d4">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">一</span><span class="dd">8/24</span></div>
+      <div class="d-body">
+        <div class="d-type">臀腿</div>
+        <div class="d-detail">和上周同一节，看能不能跟得更完整</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1FczFBcEBQ/" target="_blank" rel="noopener">▶ 臀腿雕刻 30′</a>
+      </div>
+    </div>
+
+    <div class="day w2" data-id="d5">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">二</span><span class="dd">8/25</span></div>
+      <div class="d-body">
+        <div class="d-type">上肢 + 薄背</div>
+        <div class="d-detail">30 分钟站立芭杆</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1qQc4zxEsi/" target="_blank" rel="noopener">▶ 上肢雕刻 30′</a>
+        <a class="vid sub" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">+ YTWL 10′</a>
+      </div>
+    </div>
+
+    <div class="day w2" data-id="d6">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">四</span><span class="dd">8/27</span></div>
+      <div class="d-body">
+        <div class="d-type">核心 + 腰腹</div>
+        <div class="d-detail">站立无跳跃 20 分钟｜针对腰侧那一圈</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1vU4y1g7Pg/" target="_blank" rel="noopener">▶ 站立核心 20′</a>
+        <div class="d-note"><b>全程收紧腹部，别塌腰。</b></div>
+      </div>
+    </div>
+
+    <div class="day w2" data-id="d7">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">五</span><span class="dd">8/28</span></div>
+      <div class="d-body">
+        <div class="d-type">手臂后侧 + 肩背<span class="tag">负重</span></div>
+        <div class="d-detail">哑铃 20 分钟</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV11o4y1175h/" target="_blank" rel="noopener">▶ 安娜·手臂肩背 20′</a>
+        <a class="vid alt" href="https://search.bilibili.com/all?keyword=growingannanas%20%E6%89%8B%E8%87%82%20%E8%82%A9%E8%83%8C" target="_blank" rel="noopener">🔎 兜底搜索</a>
+        <div class="d-note">第一次用哑铃，<b>3kg</b>。这节节奏偏快——跟不上就暂停。</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 第三周 -->
+<div class="card">
+  <h2><span class="emoji">3️⃣</span>第三周 <small>8/31 – 9/4 · 4 次</small></h2>
+  <div class="focus"><b>加手臂后侧专项。</b>这块跟练视频里最容易被略过，得单独补。</div>
+  <div class="week">
+
+    <div class="day w3" data-id="d8">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">一</span><span class="dd">8/31</span></div>
+      <div class="d-body">
+        <div class="d-type">臀腿</div>
+        <div class="d-detail">深蹲和弓步部分开始拿哑铃</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1FczFBcEBQ/" target="_blank" rel="noopener">▶ 臀腿雕刻 30′</a>
+        <div class="d-note">两手各一只 <b>3kg</b>。</div>
+      </div>
+    </div>
+
+    <div class="day w3" data-id="d9">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">二</span><span class="dd">9/1</span></div>
+      <div class="d-body">
+        <div class="d-type">上肢 + 三头<span class="tag new">新增</span></div>
+        <div class="d-detail">跟练 30 分钟 + 三头专项 5 分钟</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1qQc4zxEsi/" target="_blank" rel="noopener">▶ 上肢雕刻 30′</a>
+        <div class="d-note"><b>三头 5 分钟：</b>哑铃过顶臂屈伸 3×10（双手捧一只 5kg）＋ 凳上反屈伸 3×8。<b>手肘固定别外翻。</b></div>
+      </div>
+    </div>
+
+    <div class="day w3" data-id="d10">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">四</span><span class="dd">9/3</span></div>
+      <div class="d-body">
+        <div class="d-type">核心 + 腰腹</div>
+        <div class="d-detail">站立无跳跃 20 分钟</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1vU4y1g7Pg/" target="_blank" rel="noopener">▶ 站立核心 20′</a>
+      </div>
+    </div>
+
+    <div class="day w3" data-id="d11">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">五</span><span class="dd">9/4</span></div>
+      <div class="d-body">
+        <div class="d-type">手臂后侧 + 肩背<span class="tag">负重</span></div>
+        <div class="d-detail">换一节，避免只会做固定那几个动作</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1Lf4y1h7jk/" target="_blank" rel="noopener">▶ 安娜·无重复 20′</a>
+        <a class="vid sub" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">+ YTWL 10′</a>
+        <div class="d-note">仍是 <b>3kg</b>。</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="d-note" style="margin-top:12px;padding-top:9px;border-top:1px solid var(--line)">
+    <b>本周内学会一个动作：直臂下压。</b>练的是上背和腋后那条线，跟练视频里几乎不出现，得自己会。
+    要点：上身前倾 15–30°、<b>手肘微屈且角度固定</b>、全程别耸肩；弹力带回放一定要慢。
+    看 <a href="https://www.bilibili.com/video/BV1A7BzYJETJ/" target="_blank" rel="noopener">动作分析</a> 或
+    <a href="https://zhuanlan.zhihu.com/p/77271670" target="_blank" rel="noopener">图解</a>。
+  </div>
+</div>
+
+<!-- 第四周 -->
+<div class="card">
+  <h2><span class="emoji">4️⃣</span>第四周 <small>9/7 – 9/11 · 4 次</small></h2>
+  <div class="focus"><b>上到 5kg，周五做难度测试。</b>这周决定 9/14 能不能进第二阶段。</div>
+  <div class="week">
+
+    <div class="day w4" data-id="d12">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">一</span><span class="dd">9/7</span></div>
+      <div class="d-body">
+        <div class="d-type">臀腿</div>
+        <div class="d-detail">四周里第一次真正的加重</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1FczFBcEBQ/" target="_blank" rel="noopener">▶ 臀腿雕刻 30′</a>
+        <div class="d-note">深蹲和弓步换 <b>5kg</b>。</div>
+      </div>
+    </div>
+
+    <div class="day w4" data-id="d13">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">二</span><span class="dd">9/8</span></div>
+      <div class="d-body">
+        <div class="d-type">站姿哑铃上肢<span class="tag new">换新</span></div>
+        <div class="d-detail">从芭杆换成真正的哑铃力量课</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV18wTMzzE4q/" target="_blank" rel="noopener">▶ 站姿上肢 30′</a>
+        <a class="vid sub" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">+ YTWL 10′</a>
+        <div class="d-note">侧平举先用 <b>3kg</b>，<b>肩膀往下沉别耸肩</b>，手肘略高于手腕。</div>
+      </div>
+    </div>
+
+    <div class="day w4" data-id="d14">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">四</span><span class="dd">9/10</span></div>
+      <div class="d-body">
+        <div class="d-type">核心 + 直臂下压</div>
+        <div class="d-detail">站立核心 20 分钟 + 弹力带 3×12</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV1vU4y1g7Pg/" target="_blank" rel="noopener">▶ 站立核心 20′</a>
+        <div class="d-note">第一次把直臂下压加进训练。<b>慢、控制</b>，找上背发力。</div>
+      </div>
+    </div>
+
+    <div class="day w4" data-id="d15">
+      <div class="chk"><div class="box">✓</div></div>
+      <div class="d-name"><span class="dn">五</span><span class="dd">9/11</span></div>
+      <div class="d-body">
+        <div class="d-type">难度测试<span class="tag">分岔点</span></div>
+        <div class="d-detail">试跟一节第二阶段的课</div>
+        <a class="vid" href="https://www.bilibili.com/video/BV18G4y1w75S/" target="_blank" rel="noopener">▶ HR12WEEK · Day 12</a>
+        <a class="vid alt" href="https://search.bilibili.com/all?keyword=Heather%20Robertson%20HR12WEEK" target="_blank" rel="noopener">🔎 兜底搜索</a>
+        <div class="d-note"><b>能基本跟完</b>（暂停几次没关系）→ 9/14 按计划进第二阶段。<b>做到一半撑不住</b> → 这四周再走一轮，延两周<b>不影响 1 月的结果</b>。</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 经期 -->
+<div class="card">
+  <h2><span class="emoji">🌙</span>那几天可以做什么 <small>不计入 15 次</small></h2>
+  <div class="focus moon"><b>按当天状态挑，一个都不做也完全可以。</b>主表照常往后顺延，做了不加速、不做也不倒扣。</div>
+
+  <div class="mday">
+    <div class="t">① 量多、酸胀的那一两天</div>
+    <div class="c">只散步 ＋ 一节舒缓瑜伽。不用起早，晚上做也行。</div>
+    <a class="vid" href="https://www.bilibili.com/video/BV1vz4y1R7Us/" target="_blank" rel="noopener">▶ 舒缓放松瑜伽 15′</a>
+    <a class="vid alt" href="https://search.bilibili.com/all?keyword=%E7%94%9F%E7%90%86%E6%9C%9F%20%E7%91%9C%E4%BC%BD%20%E8%88%92%E7%BC%93" target="_blank" rel="noopener">🔎 兜底搜索</a>
+  </div>
+
+  <div class="mday">
+    <div class="t">② 腰酸背痛为主</div>
+    <div class="c">拉伸比训练管用。肩颈和腰背一起松开，做完当天就舒服。</div>
+    <a class="vid" href="https://www.bilibili.com/video/BV1ML411H74c/" target="_blank" rel="noopener">▶ 林芊妤·肩颈腰背拉筋 22′</a>
+    <a class="vid alt" href="https://www.bilibili.com/video/BV13e7w6zEhU/" target="_blank" rel="noopener">全身拉伸 15′</a>
+  </div>
+
+  <div class="mday">
+    <div class="t">③ 感觉良好、想练点什么</div>
+    <div class="c"><b>只练上半身</b>，重量降一档（哑铃减到 2–3kg）。上背和手臂不受影响，练完不会更累。</div>
+    <a class="vid" href="https://www.bilibili.com/video/BV1qm421779Y/" target="_blank" rel="noopener">▶ YTWL 肩背 10′</a>
+    <a class="vid alt" href="https://www.bilibili.com/video/BV11o4y1175h/" target="_blank" rel="noopener">安娜·手臂肩背 20′（减重量）</a>
+  </div>
+
+  <div class="mday">
+    <div class="t">这几天的取舍</div>
+    <div class="yn">
+      <div class="col y"><h3>✅ 可以</h3><ul>
+        <li>散步、拉伸、舒缓瑜伽</li>
+        <li>上肢、上背的轻负重</li>
+        <li>肩颈和腰背的放松</li>
+      </ul></div>
+      <div class="col n"><h3>⚠️ 先放放</h3><ul>
+        <li>核心、卷腹（腹压大）</li>
+        <li>大重量深蹲、硬拉</li>
+        <li>跳跃、长时间倒立</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <div class="d-note" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+    <b>判断标准只有一个：做完更舒服还是更难受。</b>更难受就停，这几天没有任何进度需要追。
+  </div>
+</div>
+
+<!-- 器材 -->
+<div class="card">
+  <h2><span class="emoji">🧰</span>器材清单</h2>
+  <div class="kit"><span>哑铃 3kg 一对</span><span>第 2 周起</span></div>
+  <div class="kit"><span>哑铃 5kg 一对</span><span>第 4 周起</span></div>
+  <div class="kit"><span>弹力带一套</span><span>第 4 周起</span></div>
+  <div class="kit"><span>瑜伽垫</span><span>第 1 周</span></div>
+  <div class="kit"><span>一把稳的椅子</span><span>凳上反屈伸用</span></div>
+</div>
+
+<!-- 后面的路 -->
+<div class="card">
+  <h2><span class="emoji">🧭</span>后面还有两段</h2>
+  <div class="leg now"><span class="n">1</span><div><b>打基础 · 中文口令课</b><br><span class="when">8/18 – 9/11 · 4 周 · 就是这张表</span></div></div>
+  <div class="leg"><span class="n">2</span><div><b>HR12WEEK 3.0</b>——12 周成套跟练，每节 30 分钟，按 Day 编号往下走<br><span class="when">9/14 – 12/7 · 12 周</span></div></div>
+  <div class="leg"><span class="n">3</span><div><b>加重量重跑</b>——同样的课，更重的哑铃，收尾巩固<br><span class="when">12/8 – 1/31 · 8 周</span></div></div>
+  <div class="d-note" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+    搬运视频随时可能下架。看到能用的合集<b>先收藏，最好用客户端缓存到手机</b>——第二阶段那 12 周尤其值得提前存。
+  </div>
+</div>
+
+<!-- 容易忘的 -->
+<div class="card">
+  <h2><span class="emoji">🍳</span>两件容易忘的</h2>
+  <ul class="tips">
+    <li><b>训练日早餐要有一掌以上的蛋白。</b>晨练在早餐前，这顿就是练后餐——加 1 个蛋、酸奶加量。</li>
+    <li><b>每天晚饭后散步 30–40 分钟不要断。</b>它不在这张表里，但它是这半年最稳定的那部分。</li>
+  </ul>
+</div>
+
+<div class="mantra">
+  这四周不比重量，比出勤；<br>
+  跟不上就暂停，姿势永远排第一。<br>
+  15 次做完，第二阶段才真正开始。
+</div>
+
+<div class="foot">
+  以上为一般健身建议，非个体化医疗方案。<br>
+  若有基础疾病或不适，请咨询医生 / 专业教练。<br>
+  <a href="调理主页.html">← 回调理主页</a>
+</div>
+
+<script>
+(function(){
+  var KEY='morning-plan-p1';
+  var state={};
+  try{ state=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ state={}; }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+
+  var days=[].slice.call(document.querySelectorAll('.day'));
+  var doneN=document.getElementById('doneN');
+  var fill=document.getElementById('fill');
+
+  function paint(){
+    var n=0;
+    days.forEach(function(d){
+      var on=!!state[d.dataset.id];
+      if(on) n++;
+      d.classList.toggle('done',on);
+    });
+    doneN.textContent=n;
+    fill.style.width=(n/days.length*100)+'%';
+  }
+
+  days.forEach(function(d){
+    d.querySelector('.chk').addEventListener('click',function(){
+      var id=d.dataset.id;
+      if(state[id]){ delete state[id]; } else { state[id]=1; }
+      save(); paint();
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click',function(){
+    if(confirm('清空这 15 次的打卡记录？')){ state={}; save(); paint(); }
+  });
+
+  paint();
+})();
+</script>
+
+</body>
+</html>
