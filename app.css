@@ -503,7 +503,10 @@ textarea {
 .tr-cd, .tr-gap { display: block; font-size: 10.5px; color: var(--ink-soft); }
 .tr-gap { color: #b9afac; }
 .tr-w { font-size: 11px; color: var(--ink-soft); margin-left: 1px; }
-.tr-d { font-size: 11px; color: #7a8a6e; margin-left: 4px; font-weight: 600; }
+.tr-d { display: inline-block; font-size: 10px; font-weight: 600; margin-left: 6px; padding: 1px 5px;
+  border-radius: 999px; white-space: nowrap; vertical-align: middle; }
+.tr-d.up { background: #e4e9e0; color: #6f8062; }
+.tr-d.down { background: #f0e5e3; color: #a2807c; }
 .tr-none { color: #d5cdc9; }
 .tr-stage {
   display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px;

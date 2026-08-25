@@ -1277,7 +1277,11 @@ window.Views = (function () {
           if (visits[k].scan[side + 'A'] != null) { d = val - visits[k].scan[side + 'A']; break; }
         }
         const w = v.scan[side + 'B'] != null ? `<span class="tr-w">×${v.scan[side + 'B']}</span>` : '';
-        return `<b>${val}</b>${w}${d != null && d !== 0 ? `<span class="tr-d">${fmtDelta(d)}</span>` : ''}${maturityTag(val)}`;
+        // 变化量单独做成胶囊 + 箭头：紧跟在「11×7」后面写「+2」会被误读成第三个径线
+        const dTag = d != null && d !== 0
+          ? `<span class="tr-d ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(Math.round(d * 10) / 10)}</span>`
+          : '';
+        return `<b>${val}</b>${w}${dTag}${maturityTag(val)}`;
       };
       return `<tr>
         <td class="tr-date">${v.date.slice(5).replace('-', '/')}<span class="tr-cd">第${cd}天</span>${gap != null ? `<span class="tr-gap">隔${gap}天</span>` : ''}</td>
@@ -1309,7 +1313,7 @@ window.Views = (function () {
           </table>
         </div>
         <div class="tr-sum">${summary}</div>
-        <div class="sub" style="margin-top:8px">变化量是跟<b>上一次记过这侧</b>的复查比。看「每天多少」比看单个数字有用——两边都停着不动，和一边开始往上走，是完全不同的两回事。</div>
+        <div class="sub" style="margin-top:8px"><b>▲▼</b> 是跟<b>上一次记过这侧</b>的复查比，<b>不是第三个径线</b>。看「每天多少」比看单个数字有用——两边都停着不动，和一边开始往上走，是完全不同的两回事。</div>
         <div class="sub" style="margin-top:4px">尺寸标尺（参考）：成熟一般在 <b>18–25mm</b>，到 18 标「接近成熟」；<b>不足 14mm</b> 还早。仅供对照，具体以复查为准。</div>
       </div>`;
   }
