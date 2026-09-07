@@ -1239,14 +1239,23 @@ window.Views = (function () {
 
   /* 监测趋势：把本周期每次复查按日期排开，算出「隔了几天、长了多少、每天多少」。
      单看两个孤立数字看不出快慢，看「每天长多少」才知道有没有在动。 */
+  /* 卵泡按「平均直径」看，不按长径：它是个装液体的囊，成熟看的是里面有多少液体。
+     20×11 和 20×20 长径一样，体积差三倍——只看长径会被拉长的形状骗过去。
+     只记了一个径时就用那个数（已是当时能拿到的最好估计）。 */
+  function folMean(a, b) {
+    if (a == null) return null;
+    if (b == null) return a;
+    return Math.round((a + b) / 2 * 10) / 10;
+  }
   function trendRate(visits, side) {
     const seen = visits.filter((v) => v.scan[side + 'A'] != null);
     if (seen.length < 2) return null;
     const first = seen[0], last = seen[seen.length - 1];
     const gap = D.diffDays(first.date, last.date);
     if (gap <= 0) return null;
-    const delta = last.scan[side + 'A'] - first.scan[side + 'A'];
-    return { from: first.scan[side + 'A'], to: last.scan[side + 'A'], gap, delta, perDay: delta / gap };
+    const from = folMean(first.scan[side + 'A'], first.scan[side + 'B']);
+    const to = folMean(last.scan[side + 'A'], last.scan[side + 'B']);
+    return { from, to, gap, delta: to - from, perDay: (to - from) / gap };
   }
   function fmtDelta(n) {
     if (n == null) return '';
@@ -1269,19 +1278,23 @@ window.Views = (function () {
       const prev = visits[i - 1];
       const gap = prev ? D.diffDays(prev.date, v.date) : null;
       const cell = (side) => {
-        const val = v.scan[side + 'A'];
-        if (val == null) return '<span class="tr-none">—</span>';
+        const a = v.scan[side + 'A'], b = v.scan[side + 'B'];
+        if (a == null) return '<span class="tr-none">—</span>';
+        const mean = folMean(a, b);
         // 跟上一次「记过这一侧」的复查比，中间漏记的不算断档
         let d = null;
         for (let k = i - 1; k >= 0; k--) {
-          if (visits[k].scan[side + 'A'] != null) { d = val - visits[k].scan[side + 'A']; break; }
+          const pa = visits[k].scan[side + 'A'];
+          if (pa != null) { d = mean - folMean(pa, visits[k].scan[side + 'B']); break; }
         }
-        const w = v.scan[side + 'B'] != null ? `<span class="tr-w">×${v.scan[side + 'B']}</span>` : '';
+        const w = b != null ? `<span class="tr-w">×${b}</span>` : '';
+        // 两个径都记了，「均」才是真的平均直径；只记一个时它等于那个数，不必重复显示
+        const m = b != null ? `<span class="tr-mean">均 ${mean}</span>` : '';
         // 变化量单独做成胶囊 + 箭头：紧跟在「11×7」后面写「+2」会被误读成第三个径线
         const dTag = d != null && d !== 0
           ? `<span class="tr-d ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(Math.round(d * 10) / 10)}</span>`
           : '';
-        return `<b>${val}</b>${w}${dTag}${maturityTag(val)}`;
+        return `<b>${a}</b>${w}${m}${dTag}${maturityTag(mean)}`;
       };
       return `<tr>
         <td class="tr-date">${v.date.slice(5).replace('-', '/')}<span class="tr-cd">第${cd}天</span>${gap != null ? `<span class="tr-gap">隔${gap}天</span>` : ''}</td>
@@ -1314,7 +1327,7 @@ window.Views = (function () {
         </div>
         <div class="tr-sum">${summary}</div>
         <div class="sub" style="margin-top:8px"><b>▲▼</b> 是跟<b>上一次记过这侧</b>的复查比，<b>不是第三个径线</b>。看「每天多少」比看单个数字有用——两边都停着不动，和一边开始往上走，是完全不同的两回事。</div>
-        <div class="sub" style="margin-top:4px">尺寸标尺（参考）：成熟一般在 <b>18–25mm</b>，到 18 标「接近成熟」；<b>不足 14mm</b> 还早。仅供对照，具体以复查为准。</div>
+        <div class="sub" style="margin-top:4px">尺寸标尺（参考）：按<b>平均直径</b>（长＋宽）÷2 判断——卵泡是装液体的囊，<b>只看长径会被拉长的形状骗过去</b>。成熟一般在 <b>18–25mm</b>，到 18 标「接近成熟」；<b>不足 14mm</b> 还早。仅供对照，具体以复查为准。</div>
       </div>`;
   }
 

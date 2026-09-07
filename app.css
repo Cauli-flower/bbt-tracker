@@ -503,6 +503,7 @@ textarea {
 .tr-cd, .tr-gap { display: block; font-size: 10.5px; color: var(--ink-soft); }
 .tr-gap { color: #b9afac; }
 .tr-w { font-size: 11px; color: var(--ink-soft); margin-left: 1px; }
+.tr-mean { font-size: 10.5px; color: var(--scan); margin-left: 5px; font-weight: 600; }
 .tr-d { display: inline-block; font-size: 10px; font-weight: 600; margin-left: 6px; padding: 1px 5px;
   border-radius: 999px; white-space: nowrap; vertical-align: middle; }
 .tr-d.up { background: #e4e9e0; color: #6f8062; }
