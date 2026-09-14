@@ -153,12 +153,17 @@ window.Cycle = (function () {
   }
 
   /* 三天高温法则：找升温日 + 覆盖线。
-   * 候选升温日：前面至少有 4 个可用读数；取其中最近 6 个的最高值 +0.05 作为覆盖线；
-   * 候选日及其后连续两个读数都不低于覆盖线 → 确认排卵。
+   * 候选升温日：不早于第 MIN_RISE_CD 天，前面至少有 4 个可用读数；取其中最近 6 个的最高值 +0.05 作为覆盖线；
+   * 候选日及其后连续两个读数都不低于覆盖线，且其中至少一天比那 6 个的最高值高出 RISE_MIN → 确认排卵。
    * allowOff=false（严格）时，受用药影响的点既不进覆盖线取样窗口、也不能当确认用的那三天。
    * 返回 { idx, coverline }；没找到 idx=-1。 */
+  // 经期那几天常是整个周期体温最低的时候。以前只要前面凑够 4 个读数就开始找，
+  // 经后体温回到平常水平（甚至只是慢慢往回爬）就会被判成"升温"，排卵日算到第 4 天。
+  const MIN_RISE_CD = 8;     // 第 7 天之前排卵生理上几乎不可能，这之前一律不判
+  const RISE_MIN = 0.2;      // 只高出覆盖线一点点的"升温"多半是缓慢漂移，得有一天明显抬起来才算
   function findRise(pts, allowOff) {
     for (let i = 4; i < pts.length; i++) {
+      if (pts[i].cd != null && pts[i].cd < MIN_RISE_CD) continue;
       const trio = pts.slice(i, i + 3);
       if (trio.length < 3) break;          // 后面读数不足 3 个，暂不能确认
       if (!allowOff && trio.some((p) => p.off)) continue;
@@ -166,8 +171,10 @@ window.Cycle = (function () {
       if (!allowOff) prior = prior.filter((p) => !p.off);
       prior = prior.slice(-6);
       if (prior.length < 4) continue;
-      const cl = +(Math.max.apply(null, prior.map((p) => p.temp)) + 0.05).toFixed(2);
-      if (trio.every((p) => p.temp >= cl)) return { idx: i, coverline: cl };
+      const hi = Math.max.apply(null, prior.map((p) => p.temp));
+      const cl = +(hi + 0.05).toFixed(2);
+      const jump = +(hi + RISE_MIN).toFixed(2);
+      if (trio.every((p) => p.temp >= cl) && trio.some((p) => p.temp >= jump)) return { idx: i, coverline: cl };
     }
     return { idx: -1, coverline: null };
   }
