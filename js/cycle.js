@@ -152,29 +152,48 @@ window.Cycle = (function () {
     return cycles;
   }
 
-  /* 三天高温法则：找升温日 + 覆盖线。
-   * 候选升温日：不早于第 MIN_RISE_CD 天，前面至少有 4 个可用读数；取其中最近 6 个的最高值 +0.05 作为覆盖线；
-   * 候选日及其后连续两个读数都不低于覆盖线，且其中至少一天比那 6 个的最高值高出 RISE_MIN → 确认排卵。
-   * allowOff=false（严格）时，受用药影响的点既不进覆盖线取样窗口、也不能当确认用的那三天。
+  /* 找升温日 + 覆盖线：按 Sensiplan（症状体温法）的体温规则，不自己拼条件。
+   * 第一个高温值：比它前面 6 个读数都高；覆盖线 = 这 6 个里的最高值。
+   *   常规：  连续 3 个读数都高于覆盖线，第 3 个至少高出 RISE_MIN → 确认
+   *   例外 1：第 3 个没高出 RISE_MIN，再等第 4 个，只要还在覆盖线上方就确认
+   *   例外 2：第 2、3 个里有一个落到覆盖线上或线下，划掉不算、往后补一个，
+   *           补齐后的第 3 个高温值仍要高出 RISE_MIN。两条例外不能叠着用
+   * 读数先按 0.05℃ 一档取整再比（Sensiplan 对两位小数体温计的做法）：36.12 和 36.10 是同一档，
+   * 差 0.02 不算"更高"，免得体温计末位的抖动被当成升温。
+   * 原因不明的偏高值照样算进那 6 个——它把覆盖线抬高了，由例外 1 消化，不靠人猜哪天"不准"。
+   * 以前自己拼的规则没有例外：前 6 个里冒一个偏高值，第 3 天差一点没高出 0.2，
+   * 这个高温值又进了后面候选的那 6 个，整个周期就再也判不出来。
+   * allowOff=false（严格）时，受用药影响的点既不进那 6 个、也不能当确认用的读数。
    * 返回 { idx, coverline }；没找到 idx=-1。 */
-  // 经期那几天常是整个周期体温最低的时候。以前只要前面凑够 4 个读数就开始找，
-  // 经后体温回到平常水平（甚至只是慢慢往回爬）就会被判成"升温"，排卵日算到第 4 天。
+  // 经期那几天常是整个周期体温最低的时候，经后体温回到平常水平会长得像"升温"。
   const MIN_RISE_CD = 8;     // 第 7 天之前排卵生理上几乎不可能，这之前一律不判
-  const RISE_MIN = 0.2;      // 只高出覆盖线一点点的"升温"多半是缓慢漂移，得有一天明显抬起来才算
+  const RISE_MIN = 0.2;
+  const LOW_N = 6;
+  const step = (t) => Math.round(t * 20) / 20;   // 取整到 0.05 一档
   function findRise(pts, allowOff) {
-    for (let i = 4; i < pts.length; i++) {
-      if (pts[i].cd != null && pts[i].cd < MIN_RISE_CD) continue;
-      const trio = pts.slice(i, i + 3);
-      if (trio.length < 3) break;          // 后面读数不足 3 个，暂不能确认
-      if (!allowOff && trio.some((p) => p.off)) continue;
+    for (let i = LOW_N; i < pts.length; i++) {
+      const first = pts[i];
+      if (first.cd != null && first.cd < MIN_RISE_CD) continue;
+      if (!allowOff && first.off) continue;
       let prior = pts.slice(0, i);
       if (!allowOff) prior = prior.filter((p) => !p.off);
-      prior = prior.slice(-6);
-      if (prior.length < 4) continue;
-      const hi = Math.max.apply(null, prior.map((p) => p.temp));
-      const cl = +(hi + 0.05).toFixed(2);
-      const jump = +(hi + RISE_MIN).toFixed(2);
-      if (trio.every((p) => p.temp >= cl) && trio.some((p) => p.temp >= jump)) return { idx: i, coverline: cl };
+      prior = prior.slice(-LOW_N);
+      if (prior.length < LOW_N) continue;
+      const cl = Math.max.apply(null, prior.map((p) => step(p.temp)));
+      const above = (p) => step(p.temp) > cl + 1e-9;
+      const jumps = (p) => step(p.temp) - cl >= RISE_MIN - 1e-9;   // 防浮点误差：36.55-36.35 不能算成 0.1999…
+      if (!above(first)) continue;
+
+      const s = pts.slice(i, i + 4);
+      if (s.length < 3) break;             // 后面读数不够，暂不能确认
+      let used = null;                     // 确认用到的那几个高温值
+      if (above(s[1]) && above(s[2])) {
+        if (jumps(s[2])) used = s.slice(0, 3);
+        else if (s[3] && above(s[3])) used = s;                               // 例外 1
+      } else if (above(s[1]) !== above(s[2]) && s[3] && above(s[3]) && jumps(s[3])) {
+        used = [s[0], above(s[1]) ? s[1] : s[2], s[3]];                       // 例外 2
+      }
+      if (used && (allowOff || !used.some((p) => p.off))) return { idx: i, coverline: +cl.toFixed(2) };
     }
     return { idx: -1, coverline: null };
   }
