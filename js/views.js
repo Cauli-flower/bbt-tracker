@@ -1196,7 +1196,7 @@ window.Views = (function () {
         <div class="vtitle">${a.title} ${confirmBadge}</div>
         <div>${a.text}</div>
         ${a.lhHint ? `<div style="margin-top:8px">🔎 ${a.lhHint}</div>` : ''}
-        ${a.lhSurge ? `<div style="margin-top:8px">📈 试纸在 ${D.human(a.lhSurge.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[a.lhSurge.from]}→${LH_L[a.lhSurge.to]}），LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${a.lhSurge.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>` : ''}
+        ${surgeLine(a, cycle)}
         ${a.lhCaveat ? `<div style="margin-top:8px;color:#877049">⚠️ ${a.lhCaveat}</div>` : ''}
         ${a.confoundedNote ? `<div style="margin-top:8px">💊 ${a.confoundedNote}</div>` : ''}
         ${a.medStartNote ? `<div style="margin-top:8px">💊 ${a.medStartNote}</div>` : ''}
@@ -1235,6 +1235,17 @@ window.Views = (function () {
       const rec = (cycle.days || []).find((d) => d.date === ds);
       showDayPopup(cycle, ds, rec);
     }));
+  }
+
+  /* 试纸跃升那句话：「24–48 小时内排卵、进入密集监测」只在还在等排卵时有用。
+     体温确认排卵后还挂着，半个月后看着像又要排卵了；已结束、没确认的周期也没什么可"进入"的。 */
+  function surgeLine(a, cycle) {
+    const s = a.lhSurge;
+    if (!s) return '';
+    const head = `📈 试纸在 ${D.human(s.date).replace(/ 周.$/, '')} 明显跃升（${LH_L[s.from]}→${LH_L[s.to]}）`;
+    if (a.ovulationConfirmed) return `<div style="margin-top:8px">${head}，之后体温升高，和这次排卵对得上。</div>`;
+    if (!cycle.isOpen) return '';
+    return `<div style="margin-top:8px">${head}，LH 可能正在冲峰、约 24–48 小时内排卵——进入密集监测、配合复查${s.fresh ? '' : '（此后曲线若持续升温即已确认）'}。</div>`;
   }
 
   /* 监测趋势：把本周期每次复查按日期排开，算出「隔了几天、长了多少、每天多少」。
